@@ -30,6 +30,35 @@ def main():
     filtered_data = filter.data(df, config_array)
     print(filtered_data)
 
+    sns.set_theme(style="whitegrid", palette="pastel")
+
+    df_sorted = filtered_data.sort_values("GDP_Value", ascending=False)
+
+    # 2. Modern Theme
+    sns.set_theme(style="whitegrid")
+    plt.figure(figsize=(10, 14))
+
+    ax = sns.barplot(
+        data=df_sorted,
+        x="GDP_Value",
+        y="Country Code",
+        hue="Country Code",
+        palette="flare",
+        legend=False
+    )
+
+    plt.xlabel("GDP Value (USD)", fontsize=12, fontweight='bold', labelpad=15)
+    plt.ylabel("Country Code", fontsize=12, fontweight='bold', labelpad=15)
+    plt.title("Top Global GDPs by Country",
+              fontsize=16, fontweight='bold', pad=20)
+
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(
+        lambda x, loc: "{:,}".format(int(x))))
+
+    sns.despine(left=True, bottom=True)
+    plt.tight_layout()
+    plt.show()
+
 
 if __name__ == "__main__":
     main()
