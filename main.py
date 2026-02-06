@@ -10,9 +10,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-config_array = config_parser.get_config_options()
-
-
 def print_section(title: str) -> None:
     """Print a formatted section header."""
     print("\n" + "="*60)
@@ -21,6 +18,8 @@ def print_section(title: str) -> None:
 
 
 def main():
+
+    config_array = config_parser.get_config_options()
     print_section("SDA PROJECT PHASE 1 - Data Loading & Processing")
 
     #  Load Data
