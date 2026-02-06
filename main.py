@@ -28,26 +28,8 @@ def main():
     # Step 3: Extract Metadata
 
     df = pd.read_csv('temp_test.csv')
-
-    filtered_data = df.pipe(
-        filter.region, config_array['region']).pipe(filter.year, str(config_array['year']))
-    if config_array['operation'] == 'average':
-        df = df.groupby('Continent', as_index=False)['GDP_Value'].mean()
-    elif config_array['operation'] == 'sum':
-        df = df.groupby('Continent', as_index=False)['GDP_Value'].sum()
-
-    sns.barplot(
-        data=df,
-        x='Continent',
-        y='GDP_Value'
-    )
-    sns.histplot(
-        data=df,
-        x='Continent',
-        y='GDP_Value'
-    )
-
-    plt.show()
+    filtered_data = filter.data(df, config_array)
+    print(filtered_data)
 
 
 if __name__ == "__main__":

@@ -14,3 +14,16 @@ def country(data, val):
 
 def year(data, val):
     return data[data['Year'] == val]
+
+
+def data(filtered_data: pd.DataFrame, config: list) -> list:
+    filtered_data = filtered_data.pipe(
+        region, config['region']).pipe(year, config['year'])
+
+    # if config_array['operation'] == 'average':
+    #     filtered_data = filtered_data.groupby('Continent', as_index=False)[
+    #         'GDP_Value'].mean()
+    # elif config_array['operation'] == 'sum':
+    #     filtered_data = filtered_data.groupby('Continent', as_index=False)[
+    #         'GDP_Value'].sum()
+    return filtered_data
