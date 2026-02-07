@@ -16,15 +16,19 @@ def year(data, val):
     return data[data['Year'] == val]
 
 
-def data(filtered_data: pd.DataFrame, config: list) -> list:
-    filtered_data = filtered_data.pipe(
-        region, config['region'])
-    # .pipe(year, config['year'])
-
+def accumulate(filtered_data: pd.DataFrame, config: list, accumulate_by='Country Name'):
     if config['operation'] == 'average':
-        filtered_data = filtered_data.groupby('Country Code', as_index=False)[
+        filtered_data = filtered_data.groupby(accumulate_by, as_index=False)[
             'GDP_Value'].mean()
     elif config['operation'] == 'sum':
-        filtered_data = filtered_data.groupby('Country Code', as_index=False)[
+        filtered_data = filtered_data.groupby(accumulate_by, as_index=False)[
             'GDP_Value'].sum()
+    return filtered_data
+
+
+# def data(filtered_data: pd.DataFrame, config: list) -> list:
+#     filtered_data = filtered_data.pipe(
+#         region, config['region'])
+#     # .pipe(year, config['year'])
+
     return filtered_data
