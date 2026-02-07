@@ -93,3 +93,18 @@ def plot_year_line(df, x_col, y_col, ax):
     # 10 year as one warna overcrowding
     ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
     sns.despine(ax=ax, left=True)
+
+
+# FIX: ISKO THEEKH KRNA
+def plot_year_scatter(df, x_col, y_col, ax):
+    sns.regplot(
+        data=df, x=x_col, y=y_col,
+        scatter_kws={'alpha': 0.4, 'color': '#e76f51', 's': 40},
+        line_kws={'color': '#264653', 'linewidth': 2},
+        ax=ax, ci=None
+    )
+    sns.boxplot
+    ax.set_title('GDP Distribution & Regression',
+                 fontsize=14, fontweight='bold', pad=15)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
+    sns.despine(ax=ax, left=True)
