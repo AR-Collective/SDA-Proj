@@ -2,11 +2,10 @@
 """
 SDA Project Phase 1 - Data Loading and Processing
 """
-from data_loader import reshape_to_long_format, load_csv
-from data_processor import clean_dataframe
-import config_parser
-import pandas as pd
-import filter
+from src.data_loader import reshape_to_long_format, load_csv
+from src.data_cleaner import clean_dataframe
+import src.config_loader as config_loader
+import src.data_filter as filter
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -21,7 +20,7 @@ def print_section(title: str) -> None:
 def main():
     filepath = "gdp_with_continent_filled.csv"
     try:
-        config_array = config_parser.get_config_options()
+        config_array = config_loader.get_config_options()
         print_section("SDA PROJECT PHASE 1 - Data Loading & Processing")
 
         df = load_csv(filepath)  # file read
