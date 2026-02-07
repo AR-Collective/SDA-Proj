@@ -3,11 +3,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
 
-def plot_pretty_bar(df, value_col, label_col, palette='viridis', title_prefix="Total Contribution", ax=None):
-    # 1. Create a copy to avoid SettingWithCopyWarning or altering original data
-    df = df.copy()
+def humanize_numbers(df, value_col):
     max_val = df[value_col].max()
-
     if max_val >= 1e12:
         df['Display_Val'] = df[value_col] / 1e12
         unit = "Trillions"
@@ -20,14 +17,18 @@ def plot_pretty_bar(df, value_col, label_col, palette='viridis', title_prefix="T
     else:
         df['Display_Val'] = df[value_col]
         unit = "Value"
+    return unit
 
-    # 2. Preparation
+
+def barplot(df, value_col, label_col, palette='viridis', title_prefix="Total Contribution", ax=None):
+    df = df.copy()
+
     sns.set_theme(style="whitegrid")
     df_sorted = df.sort_values(by='Display_Val')
+    unit = humanize_numbers(df, value_col)
 
-    # 3. Create Plot
-    # if ax is None:
-    #     plt.figure(figsize=(10, 6))
+    if ax is None:
+        plt.figure(figsize=(10, 6))
     barplot = sns.barplot(
         x=label_col,
         y='Display_Val',
@@ -40,7 +41,6 @@ def plot_pretty_bar(df, value_col, label_col, palette='viridis', title_prefix="T
     ax.set_ylabel("Total GDP (" + unit + ")", fontweight="bold")
     ax.set_xlabel("")
 
-    # 4. Add dynamic data labels
     for p in barplot.patches:
         val = p.get_height()
         if val > 0:
@@ -55,3 +55,27 @@ def plot_pretty_bar(df, value_col, label_col, palette='viridis', title_prefix="T
 
     target_ax = ax if ax else plt.gca()
     sns.despine(ax=target_ax)
+
+
+def donutplot(data, value_col, label_col, title="Total GDP Contribution by Continent", ax=None):
+    colors = sns.color_palette('viridis', len(data))
+    target_ax = ax if ax else plt.gca()
+    target_ax.pie(
+        data[value_col], labels=data[label_col], autopct='%1.1f%%',
+        startangle=140, colors=colors, pctdistance=0.85,
+        explode=[0.05] * len(data), textprops={'fontweight': 'bold'}
+    )
+
+    # Donut hole
+    centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+    target_ax.add_artist(centre_circle)
+    target_ax.axis('equal')
+
+    target_ax.legend(
+        data[label_col],
+        title=label_col,
+        loc="upper center",
+        bbox_to_anchor=(1, 0),
+        ncol=2,
+        fontsize=12
+    )
