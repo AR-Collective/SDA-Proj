@@ -6,8 +6,7 @@ SDA Project Phase 1 - Data Loading and Processing
 import config_parser
 import pandas as pd
 import filter
-import seaborn as sns
-import matplotlib.pyplot as plt
+from graph import show_dashboard
 
 
 def print_section(title: str) -> None:
@@ -27,37 +26,15 @@ def main():
     # Step 3: Extract Metadata
 
     df = pd.read_csv('temp_test.csv')
-    filtered_data = filter.data(df, config_array)
-    print(filtered_data)
+    gdp_region = df.pipe(filter.year, config_array['year'])
+    gdp_region = filter.accumulate(
+        gdp_region, config_array, accumulate_by='Continent')
 
-    sns.set_theme(style="whitegrid", palette="pastel")
-
-    df_sorted = filtered_data.sort_values("GDP_Value", ascending=False)
-
-    # 2. Modern Theme
-    sns.set_theme(style="whitegrid")
-    plt.figure(figsize=(10, 14))
-
-    ax = sns.barplot(
-        data=df_sorted,
-        x="GDP_Value",
-        y="Country Code",
-        hue="Country Code",
-        palette="flare",
-        legend=False
-    )
-
-    plt.xlabel("GDP Value (USD)", fontsize=12, fontweight='bold', labelpad=15)
-    plt.ylabel("Country Code", fontsize=12, fontweight='bold', labelpad=15)
-    plt.title("Top Global GDPs by Country",
-              fontsize=16, fontweight='bold', pad=20)
-
-    ax.xaxis.set_major_formatter(plt.FuncFormatter(
-        lambda x, loc: "{:,}".format(int(x))))
-
-    sns.despine(left=True, bottom=True)
-    plt.tight_layout()
-    plt.show()
+    gdp_region = gdp_region[gdp_region['Continent'] != 'Global']
+    by_year = df.pipe(filter.region, config_array['region'])
+    by_year = filter.accumulate(
+        by_year, config_array, accumulate_by='Year')
+    show_dashboard(gdp_region, by_year)
 
 
 if __name__ == "__main__":
