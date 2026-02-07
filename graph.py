@@ -38,6 +38,7 @@ def barplot(df, value_col, label_col, palette='viridis', title_prefix="Total Con
         legend=False,
         ax=ax
     )
+    ax.set_title(title_prefix, fontsize=14, fontweight='bold', pad=15)
     ax.set_ylabel("Total GDP (" + unit + ")", fontweight="bold")
     ax.set_xlabel("")
 
@@ -66,12 +67,14 @@ def donutplot(data, value_col, label_col, title="Total GDP Contribution by Conti
         explode=[0.05] * len(data), textprops={'fontweight': 'bold'}
     )
 
+    target_ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
+
     # Donut hole
     centre_circle = plt.Circle((0, 0), 0.70, fc='white')
     target_ax.add_artist(centre_circle)
     target_ax.axis('equal')
 
-    target_ax.legend(
+    legend = target_ax.legend(
         data[label_col],
         title=label_col,
         loc="upper center",
@@ -79,48 +82,53 @@ def donutplot(data, value_col, label_col, title="Total GDP Contribution by Conti
         ncol=2,
         fontsize=12
     )
+    legend.get_title().set_fontweight('bold')
+    for text in legend.get_texts():
+        text.set_fontweight('bold')
 
 
-def line_plot(df, x_col, y_col, ax):
+def line_plot(df, x_col, y_col, ax, region_name=""):
     sns.lineplot(
         data=df, x=x_col, y=y_col,
         color='#2a9d8f', linewidth=2.5, marker='o', markersize=6, ax=ax
     )
     ax.fill_between(df[x_col], df[y_col], color='#2a9d8f', alpha=0.1)
 
-    ax.set_title('Annual GDP Growth Trend',
-                 fontsize=14, fontweight='bold', pad=15)
+    title = f'Annual GDP Growth Trend - {region_name}' if region_name else 'Annual GDP Growth Trend'
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
+    ax.set_ylabel(y_col, fontweight='bold')
     # 10 year as one warna overcrowding
     ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
     sns.despine(ax=ax, left=True)
 
 
 # FIX: ISKO THEEKH KRNA
-def scatter_plot(df, x_col, y_col, ax):
+def scatter_plot(df, x_col, y_col, ax, region_name=""):
     sns.regplot(
         data=df, x=x_col, y=y_col,
         scatter_kws={'alpha': 0.4, 'color': '#e76f51', 's': 40},
         line_kws={'color': '#264653', 'linewidth': 2},
         ax=ax, ci=None
     )
-    ax.set_title('GDP Distribution & Regression',
-                 fontsize=14, fontweight='bold', pad=15)
+    title = f'GDP Distribution & Regression - {region_name}' if region_name else 'GDP Distribution & Regression'
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
+    ax.set_ylabel(y_col, fontweight='bold')
     ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
     sns.despine(ax=ax, left=True)
 
 
-def show_dashboard(df_by_region, df_by_year):
+def show_dashboard(df_by_region, df_by_year, region_name=""):
     fig, axes = plt.subplots(2, 2, figsize=(18, 12))
     fig.suptitle("Comprehensive GDP Analysis Dashboard",
                  fontsize=20, fontweight="bold")
 
-    line_plot(df_by_year, 'Year', 'GDP_Value', axes[0, 0])
+    line_plot(df_by_year, 'Year', 'GDP_Value', axes[0, 0], region_name=region_name)
 
-    scatter_plot(df_by_year, 'Year', 'GDP_Value', axes[0, 1])
+    scatter_plot(df_by_year, 'Year', 'GDP_Value', axes[0, 1], region_name=region_name)
 
-    barplot(df_by_region, 'GDP_Value', 'Continent', ax=axes[1, 0])
+    barplot(df_by_region, 'GDP_Value', 'Continent', ax=axes[1, 0], title_prefix="Total GDP Contribution by Continent")
 
-    donutplot(df_by_region, 'GDP_Value', 'Continent', ax=axes[1, 1])
+    donutplot(df_by_region, 'GDP_Value', 'Continent', title="Total GDP Distribution by Continent", ax=axes[1, 1])
 
     # Adjust layout to prevent overlapping labels
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])

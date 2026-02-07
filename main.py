@@ -51,7 +51,7 @@ def main():
     by_year = df_clean.pipe(filter.region, config_array['region'])
     by_year = filter.accumulate(
         by_year, config_array, accumulate_by='Year')
-    show_dashboard(gdp_region, by_year)
+    show_dashboard(gdp_region, by_year, region_name=config_array['region'])
     # except FileNotFoundError as e:
     #     print(f"\n✗ Error: {e}")
     # except Exception as e:
