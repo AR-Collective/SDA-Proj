@@ -79,3 +79,17 @@ def donutplot(data, value_col, label_col, title="Total GDP Contribution by Conti
         ncol=2,
         fontsize=12
     )
+
+
+def plot_year_line(df, x_col, y_col, ax):
+    sns.lineplot(
+        data=df, x=x_col, y=y_col,
+        color='#2a9d8f', linewidth=2.5, marker='o', markersize=6, ax=ax
+    )
+    ax.fill_between(df[x_col], df[y_col], color='#2a9d8f', alpha=0.1)
+
+    ax.set_title('Annual GDP Growth Trend',
+                 fontsize=14, fontweight='bold', pad=15)
+    # 10 year as one warna overcrowding
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
+    sns.despine(ax=ax, left=True)
