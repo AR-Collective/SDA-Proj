@@ -1,4 +1,4 @@
-import sns
+import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
@@ -21,11 +21,11 @@ def humanize_numbers(df, value_col):
 
 
 def barplot(df, value_col, label_col, palette='viridis', title_prefix="Total Contribution", ax=None):
-    df = df.copy()
+    df_plot = df.copy()
 
     sns.set_theme(style="whitegrid")
-    df_sorted = df.sort_values(by='Display_Val')
-    unit = humanize_numbers(df, value_col)
+    unit = humanize_numbers(df_plot, value_col)
+    df_sorted = df_plot.sort_values(by='Display_Val')
 
     if ax is None:
         plt.figure(figsize=(10, 6))
@@ -81,7 +81,7 @@ def donutplot(data, value_col, label_col, title="Total GDP Contribution by Conti
     )
 
 
-def plot_year_line(df, x_col, y_col, ax):
+def line_plot(df, x_col, y_col, ax):
     sns.lineplot(
         data=df, x=x_col, y=y_col,
         color='#2a9d8f', linewidth=2.5, marker='o', markersize=6, ax=ax
@@ -96,15 +96,32 @@ def plot_year_line(df, x_col, y_col, ax):
 
 
 # FIX: ISKO THEEKH KRNA
-def plot_year_scatter(df, x_col, y_col, ax):
+def scatter_plot(df, x_col, y_col, ax):
     sns.regplot(
         data=df, x=x_col, y=y_col,
         scatter_kws={'alpha': 0.4, 'color': '#e76f51', 's': 40},
         line_kws={'color': '#264653', 'linewidth': 2},
         ax=ax, ci=None
     )
-    sns.boxplot
     ax.set_title('GDP Distribution & Regression',
                  fontsize=14, fontweight='bold', pad=15)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
     sns.despine(ax=ax, left=True)
+
+
+def show_dashboard(df_by_region, df_by_year):
+    fig, axes = plt.subplots(2, 2, figsize=(18, 12))
+    fig.suptitle("Comprehensive GDP Analysis Dashboard",
+                 fontsize=20, fontweight="bold")
+
+    line_plot(df_by_year, 'Year', 'GDP_Value', axes[0, 0])
+
+    scatter_plot(df_by_year, 'Year', 'GDP_Value', axes[0, 1])
+
+    barplot(df_by_region, 'GDP_Value', 'Continent', ax=axes[1, 0])
+
+    donutplot(df_by_region, 'GDP_Value', 'Continent', ax=axes[1, 1])
+
+    # Adjust layout to prevent overlapping labels
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
