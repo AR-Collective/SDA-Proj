@@ -2,6 +2,10 @@
 """
 SDA Project Phase 1 - Data Loading and Processing
 """
+
+import pandas as pd
+import filter
+from graph import show_dashboard
 from src.data_loader import reshape_to_long_format, load_csv
 from src.data_cleaner import clean_dataframe
 import src.config_loader as config_loader
@@ -18,28 +22,40 @@ def print_section(title: str) -> None:
 
 
 def main():
+
     filepath = "gdp_with_continent_filled.csv"
-    try:
-        config_array = config_loader.get_config_options()
-        print_section("SDA PROJECT PHASE 1 - Data Loading & Processing")
 
-        df = load_csv(filepath)  # file read
-        long_data = reshape_to_long_format(df)
+    #  Load Data
 
-        df_clean = clean_dataframe(
-            long_data,
-            handle_missing=True,
-            missing_strategy='mean',  # Using mean strategy
-            remove_duplicates=True
-        )
+    # Step 3: Extract Metadata
 
-        filtered_data = filter.data(df_clean, config_array)
-        print(filtered_data)
+    # try:
+    config_array = config_loader.get_config_options()
+    print_section("SDA PROJECT PHASE 1 - Data Loading & Processing")
 
-    except FileNotFoundError as e:
-        print(f"\n✗ Error: {e}")
-    except Exception as e:
-        print(f"\n✗ Unexpected error: {e}")
+    df = load_csv(filepath)  # file read
+    long_data = reshape_to_long_format(df)
+
+    df_clean = clean_dataframe(
+        long_data,
+        handle_missing=True,
+        missing_strategy='mean',  # Using mean strategy
+        remove_duplicates=True
+    )
+
+    gdp_region = df_clean.pipe(filter.year, config_array['year'])
+    gdp_region = filter.accumulate(
+        gdp_region, config_array, accumulate_by='Continent')
+
+    gdp_region = gdp_region[gdp_region['Continent'] != 'Global']
+    by_year = df_clean.pipe(filter.region, config_array['region'])
+    by_year = filter.accumulate(
+        by_year, config_array, accumulate_by='Year')
+    show_dashboard(gdp_region, by_year)
+    # except FileNotFoundError as e:
+    #     print(f"\n✗ Error: {e}")
+    # except Exception as e:
+    #     print(f"\n✗ Unexpected error: {e}")
 
 
 if __name__ == "__main__":
