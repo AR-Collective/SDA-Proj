@@ -1,4 +1,5 @@
 import json
+import pandas as pd
 
 
 def get_config_options():
@@ -13,7 +14,7 @@ def get_config_options():
                       ', '.join(missing)}")
                 return None
 
-            return {k: data[k] for k in data}
+        return data
 
     except FileNotFoundError:
         print("Configuration error: config.json file not found.")
@@ -21,3 +22,12 @@ def get_config_options():
     except json.JSONDecodeError as e:
         print(f"Configuration error: Invalid JSON format: {e}")
         return None
+
+
+def validate_config(config_array: dict, df: pd.DataFrame) -> None:
+    if config_array['region'] not in df['Continent'].values:
+        raise ValueError(
+            f"The Region '{config_array['region']}' does not exist in the data.")
+    if config_array['year'] not in df['Year'].values:
+        raise ValueError(
+            f"Year {config_array['year']} not found in dataset.")
