@@ -25,8 +25,7 @@ def run_dashboard(df_context: dict, config_array: dict, df_clean):
     app = DashboardApp()
 
     p1 = app.add_new_page("")
-    app.add_element(p1, text_stats_element,
-                    df_context['df_by_region'], df_context['df_by_year'], df_clean, config_array)
+    app.add_element(p1, text_stats_element, df_context, config_array)
     p2 = app.add_new_page("Comprehensive GDP Analysis Dashboard")
 
     app.add_element(p2, graphs.line_plot, df_context['df_by_year'], 'Year',
@@ -87,7 +86,23 @@ def main():
                 accumulate_by='Year'
             )
         )
-        df_context = {"df_by_region": df_by_region, "df_by_year": df_by_year}
+
+        df_by_continent = (
+            df_clean
+            .pipe(
+                filter.accumulate,
+                config_array,
+                accumulate_by='Continent'
+            )
+        )
+
+        df_by_country = (
+            df_clean
+            .pipe(filter.region, config_array['region'])
+            .pipe(filter.year, config_array['year'])
+        )
+        df_context = {"df_by_region": df_by_region,
+                      "df_by_year": df_by_year, "df_by_continent": df_by_continent, "df_by_country": df_by_country}
         run_dashboard(df_context, config_array, df_clean)
 
     except FileNotFoundError as e:
