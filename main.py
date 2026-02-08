@@ -10,6 +10,8 @@ import src.config_loader as config_loader
 import src.data_filter as filter
 import sys
 import traceback
+import dashboard
+import graph
 
 
 def print_section(title: str) -> None:
@@ -39,7 +41,7 @@ def main():
 
         print(get_cleaning_summary(df, df_clean))
 
-        gdp_region = (
+        df_by_region = (
             df_clean
             .pipe(filter.year, config_array['year'])
             .pipe(
@@ -49,7 +51,7 @@ def main():
             )
             .query("Continent != 'Global'")
         )
-        by_year = (
+        df_by_year = (
             df_clean
             .pipe(filter.region, config_array['region'])
             .pipe(
@@ -59,7 +61,26 @@ def main():
             )
         )
 
-        show_dashboard(gdp_region, by_year, region_name=config_array['region'], year=config_array.get('year'))
+        app = dashboard.DashboardApp()
+
+        p1 = app.add_new_page("GDP Analysis: Executive Summary")
+        p2 = app.add_new_page("Comprehensive GDP Analysis Dashboard")
+
+        app.add_element(p2, graph.line_plot, df_by_year, 'Year',
+                        'GDP_Value', region_name="Global")
+        app.add_element(p2, graph.scatter_plot, df_by_year, 'Year',
+                        'GDP_Value', region_name="Global")
+
+        year_val = 2024
+        title_bar = f"Total GDP Contribution by Continent in {year_val}"
+        app.add_element(p2, graph.barplot, df_by_region, 'GDP_Value',
+                        'Continent', title_prefix=title_bar)
+
+        title_donut = f"Total GDP Distribution by Continent in {year_val}"
+        app.add_element(p2, graph.donutplot, df_by_region,
+                        'GDP_Value', 'Continent', title=title_donut)
+
+        app.run()
     except FileNotFoundError as e:
         print(f"\n✗ File error: {e}")
         sys.exit(1)
@@ -69,7 +90,8 @@ def main():
         # If data was loaded, help user by listing available regions and years
         if 'long_data' in locals():
             try:
-                regions = sorted(list(long_data['Continent'].dropna().unique()))
+                regions = sorted(
+                    list(long_data['Continent'].dropna().unique()))
                 year_min, year_max = extract_years_range(long_data)
                 print('\nAvailable regions (sample):', regions[:20])
                 if year_min is not None and year_max is not None:
