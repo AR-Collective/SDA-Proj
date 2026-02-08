@@ -3,13 +3,15 @@
 SDA Project Phase 1 - Data Loading and Processing
 """
 
-from graph import show_dashboard
 from src.data_loader import reshape_to_long_format, load_csv, extract_years_range
 from src.data_cleaner import clean_dataframe, get_cleaning_summary
 import src.config_loader as config_loader
 import src.data_filter as filter
 import sys
 import traceback
+from src.ui.summary_plugin import text_stats_element
+from src.ui.dashboard import DashboardApp
+import src.graphs as graphs
 
 
 def print_section(title: str) -> None:
@@ -17,6 +19,33 @@ def print_section(title: str) -> None:
     print("\n" + "="*60)
     print(f"  {title}")
     print("="*60)
+
+
+def run_dashboard(df_context: dict, config_array: dict):
+    app = DashboardApp()
+
+    p1 = app.add_new_page("")
+    app.add_element(p1, text_stats_element,
+                    df_context['df_by_region'], df_context['df_by_year'], config_array)
+    p2 = app.add_new_page("Comprehensive GDP Analysis Dashboard")
+
+    app.add_element(p2, graphs.line_plot, df_context['df_by_year'], 'Year',
+                    'GDP_Value', region_name=config_array['region'])
+    app.add_element(p2, graphs.scatter_plot, df_context['df_by_year'], 'Year',
+                    'GDP_Value', region_name=config_array['region'])
+
+    title_bar = f"Total GDP Contribution by Continent in {
+        config_array['year']}"
+    app.add_element(p2, graphs.barplot, df_context['df_by_region'], 'GDP_Value',
+                    'Continent', title_prefix=title_bar)
+
+    title_donut = f"Total GDP Distribution by Continent in {
+        config_array['year']}"
+    app.add_element(p2, graphs.donutplot, df_context['df_by_region'],
+                    'GDP_Value', 'Continent', title=title_donut)
+
+    app.run()
+    return
 
 
 def main():
@@ -39,7 +68,7 @@ def main():
 
         print(get_cleaning_summary(df, df_clean))
 
-        gdp_region = (
+        df_by_region = (
             df_clean
             .pipe(filter.year, config_array['year'])
             .pipe(
@@ -49,7 +78,7 @@ def main():
             )
             .query("Continent != 'Global'")
         )
-        by_year = (
+        df_by_year = (
             df_clean
             .pipe(filter.region, config_array['region'])
             .pipe(
@@ -58,8 +87,9 @@ def main():
                 accumulate_by='Year'
             )
         )
+        df_context = {"df_by_region": df_by_region, "df_by_year": df_by_year}
+        run_dashboard(df_context, config_array)
 
-        show_dashboard(gdp_region, by_year, region_name=config_array['region'], year=config_array.get('year'))
     except FileNotFoundError as e:
         print(f"\n✗ File error: {e}")
         sys.exit(1)
@@ -69,7 +99,8 @@ def main():
         # If data was loaded, help user by listing available regions and years
         if 'long_data' in locals():
             try:
-                regions = sorted(list(long_data['Continent'].dropna().unique()))
+                regions = sorted(
+                    list(long_data['Continent'].dropna().unique()))
                 year_min, year_max = extract_years_range(long_data)
                 print('\nAvailable regions (sample):', regions[:20])
                 if year_min is not None and year_max is not None:
