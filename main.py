@@ -109,7 +109,6 @@ def main():
         print(f"\n✗ File error: {e}")
         sys.exit(1)
     except (KeyError, ValueError) as e:
-        # Configuration or validation errors are reported clearly
         print(f"\n✗ Configuration error: {e}")
         # If data was loaded, help user by listing available regions and years
         if 'long_data' in locals():

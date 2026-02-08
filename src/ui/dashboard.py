@@ -49,7 +49,3 @@ class DashboardApp:
     def run(self):
         self._render_current_page()
         plt.show()
-
-
-def graph_element(plot_func, df, x, y, ax=None, **kwargs):
-    plot_func(df, x, y, ax=ax, **kwargs)
