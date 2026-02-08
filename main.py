@@ -9,6 +9,7 @@ from src.data_cleaner import clean_dataframe, get_cleaning_summary
 import src.config_loader as config_loader
 import src.data_filter as filter
 import sys
+import traceback
 
 
 def print_section(title: str) -> None:
@@ -60,8 +61,8 @@ def main():
 
         show_dashboard(gdp_region, by_year, region_name=config_array['region'], year=config_array.get('year'))
     except FileNotFoundError as e:
-        print(f"\n✗ Error: {e}")
-        return
+        print(f"\n✗ File error: {e}")
+        sys.exit(1)
     except (KeyError, ValueError) as e:
         # Configuration or validation errors are reported clearly
         print(f"\n✗ Configuration error: {e}")
@@ -77,10 +78,11 @@ def main():
                     print('\nAvailable years: (none)')
             except Exception:
                 pass
-        return
+        sys.exit(2)
     except Exception as e:
-        print(f"\n✗ Unexpected error: {e}")
-        return
+        print("\n✗ Unexpected error - full traceback below:")
+        traceback.print_exc()
+        sys.exit(99)
 
 
 if __name__ == "__main__":
