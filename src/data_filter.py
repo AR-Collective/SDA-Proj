@@ -1,7 +1,8 @@
 import pandas as pd
 
-data = pd.read_csv('gdp_with_continent_filled.csv')
-pd.options.display.float_format = '{:.2f}'.format
+# removed it from here, it should be in data_loader.py
+# data = pd.read_csv('gdp_with_continent_filled.csv')
+# pd.options.display.float_format = '{:.2f}'.format
 
 
 def region(data, val):
