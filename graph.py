@@ -117,7 +117,7 @@ def scatter_plot(df, x_col, y_col, ax, region_name=""):
     sns.despine(ax=ax, left=True)
 
 
-def show_dashboard(df_by_region, df_by_year, region_name=""):
+def show_dashboard(df_by_region, df_by_year, region_name="", year=None):
     fig, axes = plt.subplots(2, 2, figsize=(18, 12))
     fig.suptitle("Comprehensive GDP Analysis Dashboard",
                  fontsize=20, fontweight="bold")
@@ -126,9 +126,11 @@ def show_dashboard(df_by_region, df_by_year, region_name=""):
 
     scatter_plot(df_by_year, 'Year', 'GDP_Value', axes[0, 1], region_name=region_name)
 
-    barplot(df_by_region, 'GDP_Value', 'Continent', ax=axes[1, 0], title_prefix="Total GDP Contribution by Continent")
+    title_bar = f"Total GDP Contribution by Continent in {year}" if year else "Total GDP Contribution by Continent"
+    barplot(df_by_region, 'GDP_Value', 'Continent', ax=axes[1, 0], title_prefix=title_bar)
 
-    donutplot(df_by_region, 'GDP_Value', 'Continent', title="Total GDP Distribution by Continent", ax=axes[1, 1])
+    title_donut = f"Total GDP Distribution by Continent in {year}" if year else "Total GDP Distribution by Continent"
+    donutplot(df_by_region, 'GDP_Value', 'Continent', title=title_donut, ax=axes[1, 1])
 
     # Adjust layout to prevent overlapping labels
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])

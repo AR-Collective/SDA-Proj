@@ -57,7 +57,7 @@ def main():
             )
         )
 
-        show_dashboard(gdp_region, by_year, region_name=config_array['region'])
+        show_dashboard(gdp_region, by_year, region_name=config_array['region'], year=config_array.get('year'))
     except FileNotFoundError as e:
         print(f"\n✗ Error: {e}")
     except Exception as e:
