@@ -94,7 +94,8 @@ def line_plot(df, x_col, y_col, ax, region_name=""):
     )
     ax.fill_between(df[x_col], df[y_col], color='#2a9d8f', alpha=0.1)
 
-    title = f'Annual GDP Growth Trend - {region_name}' if region_name else 'Annual GDP Growth Trend'
+    title = f'Annual GDP Growth Trend - {
+        region_name}' if region_name else 'Annual GDP Growth Trend'
     ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
     ax.set_ylabel(y_col, fontweight='bold')
     # 10 year as one warna overcrowding
@@ -102,7 +103,6 @@ def line_plot(df, x_col, y_col, ax, region_name=""):
     sns.despine(ax=ax, left=True)
 
 
-# FIX: ISKO THEEKH KRNA
 def scatter_plot(df, x_col, y_col, ax, region_name=""):
     sns.regplot(
         data=df, x=x_col, y=y_col,
@@ -110,7 +110,8 @@ def scatter_plot(df, x_col, y_col, ax, region_name=""):
         line_kws={'color': '#264653', 'linewidth': 2},
         ax=ax, ci=None
     )
-    title = f'GDP Distribution & Regression - {region_name}' if region_name else 'GDP Distribution & Regression'
+    title = f'GDP Distribution & Regression - {
+        region_name}' if region_name else 'GDP Distribution & Regression'
     ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
     ax.set_ylabel(y_col, fontweight='bold')
     ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
@@ -122,15 +123,21 @@ def show_dashboard(df_by_region, df_by_year, region_name="", year=None):
     fig.suptitle("Comprehensive GDP Analysis Dashboard",
                  fontsize=20, fontweight="bold")
 
-    line_plot(df_by_year, 'Year', 'GDP_Value', axes[0, 0], region_name=region_name)
+    line_plot(df_by_year, 'Year', 'GDP_Value',
+              axes[0, 0], region_name=region_name)
 
-    scatter_plot(df_by_year, 'Year', 'GDP_Value', axes[0, 1], region_name=region_name)
+    scatter_plot(df_by_year, 'Year', 'GDP_Value',
+                 axes[0, 1], region_name=region_name)
 
-    title_bar = f"Total GDP Contribution by Continent in {year}" if year else "Total GDP Contribution by Continent"
-    barplot(df_by_region, 'GDP_Value', 'Continent', ax=axes[1, 0], title_prefix=title_bar)
+    title_bar = f"Total GDP Contribution by Continent in {
+        year}" if year else "Total GDP Contribution by Continent"
+    barplot(df_by_region, 'GDP_Value', 'Continent',
+            ax=axes[1, 0], title_prefix=title_bar)
 
-    title_donut = f"Total GDP Distribution by Continent in {year}" if year else "Total GDP Distribution by Continent"
-    donutplot(df_by_region, 'GDP_Value', 'Continent', title=title_donut, ax=axes[1, 1])
+    title_donut = f"Total GDP Distribution by Continent in {
+        year}" if year else "Total GDP Distribution by Continent"
+    donutplot(df_by_region, 'GDP_Value', 'Continent',
+              title=title_donut, ax=axes[1, 1])
 
     # Adjust layout to prevent overlapping labels
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])

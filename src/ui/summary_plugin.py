@@ -22,8 +22,8 @@ def text_stats_element(df_context, config_dict, ax=None):
     cfg_text = "N/A"
     try:
         op = config_dict.get('operation', 'sum').lower()
-        val = df_region['GDP_Value'].mean() if op in [
-            'avg', 'mean'] else df_region['GDP_Value'].sum()
+        val = df_region['GDP_Value'].mean(
+        ) if op == 'average' else df_region['GDP_Value'].sum()
         cfg_text = f"{op.upper()} GDP: {format_gdp(val)}"
     except:
         pass
@@ -36,7 +36,7 @@ def text_stats_element(df_context, config_dict, ax=None):
         stats_str = (f"TOTAL VIEW\n{format_gdp(df_region['GDP_Value'].sum())}\n\n"
                      f"AVERAGE\n{format_gdp(df_region['GDP_Value'].mean())}")
 
-    ax.text(0.18, 0.60, "Contextual Stats", fontsize=18, fontweight='bold', ha='center',
+    ax.text(0.18, 0.60, "Contextual Stats (Year)", fontsize=18, fontweight='bold', ha='center',
             bbox=dict(facecolor='#e3f2fd', edgecolor='#3498db', pad=5))
     ax.text(0.18, 0.45, stats_str, fontsize=15, ha='center', va='top', linespacing=1.8,
             bbox=dict(facecolor='white', edgecolor='#3498db', alpha=0.9, pad=15))
@@ -47,7 +47,7 @@ def text_stats_element(df_context, config_dict, ax=None):
         cont_str = "\n".join([f"{r['Continent'][:12]:<12} {format_gdp(
             r['GDP_Value']):>8}" for _, r in top.iterrows()])
 
-    ax.text(0.50, 0.60, "By Continent", fontsize=18, fontweight='bold', ha='center',
+    ax.text(0.50, 0.60, "By Continent (Total)", fontsize=18, fontweight='bold', ha='center',
             bbox=dict(facecolor='#e8f5e9', edgecolor='#2ecc71', pad=5))
     ax.text(0.50, 0.45, cont_str, fontsize=15, ha='center', va='top', family='monospace', linespacing=1.6,
             bbox=dict(facecolor='white', edgecolor='#2ecc71', alpha=0.9, pad=15))
@@ -60,7 +60,7 @@ def text_stats_element(df_context, config_dict, ax=None):
         country_str = "\n".join(
             [f"{name[:10]:<10} {format_gdp(val):>8}" for name, val in top_c.items()])
 
-    ax.text(0.82, 0.60, "Top Countries", fontsize=18, fontweight='bold', ha='center',
+    ax.text(0.82, 0.60, "Top Countries (TOTAL)", fontsize=18, fontweight='bold', ha='center',
             bbox=dict(facecolor='#fff3e0', edgecolor='#e67e22', pad=5))
     ax.text(0.82, 0.45, country_str, fontsize=15, ha='center', va='top', family='monospace', linespacing=1.6,
             bbox=dict(facecolor='white', edgecolor='#e67e22', alpha=0.9, pad=15))

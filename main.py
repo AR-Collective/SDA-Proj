@@ -101,9 +101,9 @@ def main():
             .pipe(filter.region, config_array['region'])
             .pipe(filter.year, config_array['year'])
         )
-        df_context = {"df_by_region": df_by_region,
+        df_filters = {"df_by_region": df_by_region,
                       "df_by_year": df_by_year, "df_by_continent": df_by_continent, "df_by_country": df_by_country}
-        run_dashboard(df_context, config_array, df_clean)
+        run_dashboard(df_filters, config_array, df_clean)
 
     except FileNotFoundError as e:
         print(f"\n✗ File error: {e}")
