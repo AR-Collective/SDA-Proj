@@ -21,12 +21,12 @@ def print_section(title: str) -> None:
     print("="*60)
 
 
-def run_dashboard(df_context: dict, config_array: dict):
+def run_dashboard(df_context: dict, config_array: dict, df_clean):
     app = DashboardApp()
 
     p1 = app.add_new_page("")
     app.add_element(p1, text_stats_element,
-                    df_context['df_by_region'], df_context['df_by_year'], config_array)
+                    df_context['df_by_region'], df_context['df_by_year'], df_clean, config_array)
     p2 = app.add_new_page("Comprehensive GDP Analysis Dashboard")
 
     app.add_element(p2, graphs.line_plot, df_context['df_by_year'], 'Year',
@@ -88,7 +88,7 @@ def main():
             )
         )
         df_context = {"df_by_region": df_by_region, "df_by_year": df_by_year}
-        run_dashboard(df_context, config_array)
+        run_dashboard(df_context, config_array, df_clean)
 
     except FileNotFoundError as e:
         print(f"\n✗ File error: {e}")
