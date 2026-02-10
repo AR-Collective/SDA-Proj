@@ -5,9 +5,10 @@ class DashboardApp:
     def __init__(self):
         self.pages = []
         self.current_page_idx = 0
-        self.fig = plt.figure(figsize=(18, 12))
+        self.fig = plt.figure(figsize=(18, 12))  # default figure size
         # MATPLOT KEYBOARD KI SUNNO 🙉
-        self.fig.canvas.mpl_connect('key_press_event', self._on_key)
+        self.fig.canvas.mpl_connect(
+            'key_press_event', self._on_key)  # hook to keyboard
 
     def add_new_page(self, title):
         page = {"title": title, "elements": []}
@@ -49,7 +50,3 @@ class DashboardApp:
     def run(self):
         self._render_current_page()
         plt.show()
-
-
-def graph_element(plot_func, df, x, y, ax=None, **kwargs):
-    plot_func(df, x, y, ax=ax, **kwargs)

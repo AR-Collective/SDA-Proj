@@ -1,145 +1,74 @@
 import pandas as pd
-import sys
-sys.path.insert(0, '/Users/asjadraza/SDA-Proj/src')
-from data_filter import region, year, accumulate
 
-def _get_config_result(df_clean, config_dict):
-    try:
-        if df_clean is None or df_clean.empty:
-            return "(No data)"
-        
-        q = df_clean.copy()
-        if 'Continent' in q.columns:
-            q = q[q['Continent'] == config_dict.get('region')]
-        if 'Year' in q.columns:
-            q = q[q['Year'] == int(config_dict.get('year'))]
-        
-        if q.empty or 'GDP_Value' not in q.columns:
-            return "Filtered data is empty (no matching region/year)"
-        
-        op = config_dict.get('operation', 'sum')
-        val = float(q['GDP_Value'].mean()) if op in ['average', 'avg', 'mean'] else float(q['GDP_Value'].sum())
-        return f"{op.title()} GDP ({config_dict.get('region')}, {config_dict.get('year')}): ${val:,.2f}"
-    except Exception:
-        return "Configuration computation failed"
 
-def _get_year_stats(df_year):
-    try:
-        if df_year.empty or 'GDP_Value' not in df_year.columns:
-            return 0.0, 0.0, "N/A", "N/A"
-        
-        year_max = float(df_year['GDP_Value'].max())
-        year_min = float(df_year['GDP_Value'].min())
-        year_with_max = int(df_year.loc[df_year['GDP_Value'].idxmax(), 'Year']) if 'Year' in df_year.columns else "N/A"
-        year_with_min = int(df_year.loc[df_year['GDP_Value'].idxmin(), 'Year']) if 'Year' in df_year.columns else "N/A"
-        return year_max, year_min, year_with_max, year_with_min
-    except Exception:
-        return 0.0, 0.0, "N/A", "N/A"
-
-def _get_continent_stats(df_clean):
-    try:
-        if df_clean is None or 'Continent' not in df_clean.columns:
-            return "(No data)", "", ""
-        
-        cont_avgs = (
-            df_clean
-            .dropna(subset=['Continent'])
-            .groupby('Continent', as_index=False)['GDP_Value']
-            .mean()
-            .sort_values('GDP_Value', ascending=False)
-        )
-        
-        if cont_avgs.empty:
-            return "(No data)", "", ""
-        
-        cont_lines = [f"{row['Continent']}: ${row['GDP_Value']:,.2f}" for _, row in cont_avgs.iterrows()]
-        max_continent = cont_avgs.iloc[0]['Continent']
-        max_val = cont_avgs.iloc[0]['GDP_Value']
-        min_continent = cont_avgs.iloc[-1]['Continent']
-        min_val = cont_avgs.iloc[-1]['GDP_Value']
-        
-        content = "\n".join(cont_lines) + f"\n\nMax: ${max_val:,.2f} ({max_continent})\nMin: ${min_val:,.2f} ({min_continent})"
-        return content, max_continent, min_continent
-    except Exception:
-        return "(calculation failed)", "", ""
-
-def _get_top_countries(df_clean):
-    try:
-        if df_clean is None or 'Country Name' not in df_clean.columns:
-            return "(No data)"
-        
-        country_avgs = (
-            df_clean
-            .dropna(subset=['Country Name'])
-            .groupby('Country Name', as_index=False)['GDP_Value']
-            .mean()
-            .nlargest(5, 'GDP_Value')
-        )
-        
-        if country_avgs.empty:
-            return "(No data)"
-        
-        country_lines = [f"{i+1}. {row['Country Name']}: ${row['GDP_Value']:,.2f}" for i, (_, row) in enumerate(country_avgs.iterrows())]
-        return "\n".join(country_lines)
-    except Exception:
-        return "(calculation failed)"
-
-def text_stats_element(df_region, df_year, df_clean, config_dict, ax=None):
+def text_stats_element(df_context, config_dict, ax=None):
     ax.axis('off')
-    ax.set_facecolor('#f4f4f4')
+    ax.set_facecolor('#fdfdfd')
 
-    ax.text(0.5, 0.95, "EXECUTIVE SUMMARY", fontsize=22, fontweight='bold',
-            ha='center', va='center', color='#2c3e50')
+    def format_gdp(val):
+        if val >= 1e12:
+            return f"${val/1e12:,.1f}T"
+        if val >= 1e9:
+            return f"${val/1e9:,.1f}B"
+        return f"${val:,.0f}"
 
-    reg_avg = float(df_region['GDP_Value'].mean()) if not df_region.empty else 0.0
-    reg_sum = float(df_region['GDP_Value'].sum()) if not df_region.empty else 0.0
+    df_region = df_context.get('df_by_region')
+    df_continents = df_context.get('df_by_continent')
+    df_country = df_context.get('df_by_country')
 
-    cfg_result_text = _get_config_result(df_clean, config_dict)
-    ax.text(0.5, 0.85, cfg_result_text,
-            fontsize=15, fontweight='bold', ha='center', va='center',
-            bbox=dict(boxstyle="round,pad=1.0", facecolor='#fff3cd', edgecolor='#f1c40f', linewidth=2, alpha=0.98))
+    ax.text(0.5, 0.94, "EXECUTIVE SUMMARY", fontsize=32, fontweight='bold',
+            ha='center', color='#1a252f')
 
-    year_max, year_min, year_with_max, year_with_min = _get_year_stats(df_year)
-    
-    stats_content = (
-        f"Total Regional GDP\n${reg_sum:,.2f}\n\n"
-        f"Average GDP\n${reg_avg:,.2f}\n\n"
-        f"Max: ${year_max:,.2f} ({year_with_max})\n"
-        f"Min: ${year_min:,.2f} ({year_with_min})"
-    )
+    cfg_text = "N/A"
+    try:
+        op = config_dict.get('operation', 'sum').lower()
+        val = df_region['GDP_Value'].mean(
+        ) if op == 'average' else df_region['GDP_Value'].sum()
+        cfg_text = f"{op.upper()} GDP: {format_gdp(val)}"
+    except:
+        pass
 
-    ax.text(0.17, 0.65, "Year Range Stats",
-            fontsize=12, fontweight='bold', ha='center', va='top',
-            bbox=dict(boxstyle="round,pad=0.3", facecolor='#e3f2fd', edgecolor='#3498db', linewidth=1.5, alpha=0.95))
-    ax.text(0.17, 0.56, stats_content,
-            fontsize=10, linespacing=1.4, ha='center', va='top',
-            bbox=dict(boxstyle="round,pad=0.8", facecolor='white', edgecolor='#3498db', linewidth=1.5, alpha=0.95))
+    ax.text(0.5, 0.82, cfg_text, fontsize=24, fontweight='bold', ha='center',
+            bbox=dict(boxstyle="round,pad=0.8", facecolor='#fff3cd', edgecolor='#f1c40f', linewidth=3))
 
-    cont_content, _, _ = _get_continent_stats(df_clean)
-    ax.text(0.50, 0.65, "Avg GDP by Continent\n(All Years)",
-            fontsize=12, fontweight='bold', ha='center', va='top',
-            bbox=dict(boxstyle="round,pad=0.3", facecolor='#e8f5e9', edgecolor='#2ecc71', linewidth=1.5, alpha=0.95))
-    ax.text(0.50, 0.56, cont_content,
-            fontsize=10, linespacing=1.2, ha='center', va='top', family='monospace',
-            bbox=dict(boxstyle="round,pad=0.8", facecolor='white', edgecolor='#2ecc71', linewidth=1.5, alpha=0.95))
+    stats_str = "No Data"
+    if df_region is not None:
+        stats_str = (f"TOTAL VIEW\n{format_gdp(df_region['GDP_Value'].sum())}\n\n"
+                     f"AVERAGE\n{format_gdp(df_region['GDP_Value'].mean())}")
 
-    country_content = _get_top_countries(df_clean)
-    ax.text(0.83, 0.65, "Top 5 Countries\n(Avg GDP All-Time)",
-            fontsize=12, fontweight='bold', ha='center', va='top',
-            bbox=dict(boxstyle="round,pad=0.3", facecolor='#fff3e0', edgecolor='#e67e22', linewidth=1.5, alpha=0.95))
-    ax.text(0.83, 0.56, country_content,
-            fontsize=10, linespacing=1.2, ha='center', va='top', family='monospace',
-            bbox=dict(boxstyle="round,pad=0.8", facecolor='white', edgecolor='#e67e22', linewidth=1.5, alpha=0.95))
+    ax.text(0.18, 0.60, "Contextual Stats (Year)", fontsize=18, fontweight='bold', ha='center',
+            bbox=dict(facecolor='#e3f2fd', edgecolor='#3498db', pad=5))
+    ax.text(0.18, 0.45, stats_str, fontsize=15, ha='center', va='top', linespacing=1.8,
+            bbox=dict(facecolor='white', edgecolor='#3498db', alpha=0.9, pad=15))
 
-    config_lines = [f"{k.replace('_', ' ').upper()}: {v}" for k, v in config_dict.items()]
-    config_content = "\n".join(config_lines) if config_lines else "(Unable to render config)"
+    cont_str = "N/A"
+    if df_continents is not None:
+        top = df_continents.nlargest(5, 'GDP_Value')
+        cont_str = "\n".join([f"{r['Continent'][:12]:<12} {format_gdp(
+            r['GDP_Value']):>8}" for _, r in top.iterrows()])
 
-    ax.text(0.50, 0.32, "SYSTEM CONFIGURATION",
-            fontsize=12, fontweight='bold', ha='center', va='top',
-            bbox=dict(boxstyle="round,pad=0.3", facecolor='#f5f5f5', edgecolor='#95a5a6', linewidth=1.5, alpha=0.95))
-    ax.text(0.50, 0.24, config_content,
-            fontsize=11, linespacing=1.4, ha='center', va='top', family='monospace',
-            bbox=dict(boxstyle="round,pad=1.0", facecolor='#ecf0f1', edgecolor='#95a5a6', linewidth=1.5, alpha=0.95))
+    ax.text(0.50, 0.60, "By Continent (Total)", fontsize=18, fontweight='bold', ha='center',
+            bbox=dict(facecolor='#e8f5e9', edgecolor='#2ecc71', pad=5))
+    ax.text(0.50, 0.45, cont_str, fontsize=15, ha='center', va='top', family='monospace', linespacing=1.6,
+            bbox=dict(facecolor='white', edgecolor='#2ecc71', alpha=0.9, pad=15))
 
-    ax.text(0.5, 0.05, "Press [RIGHT ARROW] to view Visual Charts  |  Data sourced from gdp_with_continent_filled.csv",
-            fontsize=9, style='italic', ha='center', color='#555')
+    country_str = "N/A"
+    if df_country is not None:
+        df_c = df_country[~df_country['Country Name'].str.contains(
+            '&|World|income|total', case=False, na=False)]
+        top_c = df_c.groupby('Country Name')['GDP_Value'].mean().nlargest(5)
+        country_str = "\n".join(
+            [f"{name[:10]:<10} {format_gdp(val):>8}" for name, val in top_c.items()])
+
+    ax.text(0.82, 0.60, "Top Countries (TOTAL)", fontsize=18, fontweight='bold', ha='center',
+            bbox=dict(facecolor='#fff3e0', edgecolor='#e67e22', pad=5))
+    ax.text(0.82, 0.45, country_str, fontsize=15, ha='center', va='top', family='monospace', linespacing=1.6,
+            bbox=dict(facecolor='white', edgecolor='#e67e22', alpha=0.9, pad=15))
+
+    conf_str = " | ".join(
+        [f"{k.upper()}: {v}" for k, v in config_dict.items()])
+    ax.text(0.5, 0.15, conf_str, fontsize=14, ha='center', family='monospace',
+            bbox=dict(boxstyle="sawtooth,pad=0.5", facecolor='#f8f9fa', edgecolor='#95a5a6'))
+
+    ax.text(0.5, 0.05, "Press Right to see Graphs", fontsize=10,
+            style='italic', ha='center', color='gray')
