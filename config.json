@@ -1,6 +1,6 @@
 {
-  "region": "Asia",
-  "year": 2024,
-  "operation": "sum",
+  "region": "Africa",
+  "year": 2023,
+  "operation": "average",
   "output": "dashboard"
 }
