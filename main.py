@@ -14,12 +14,13 @@ import src.config_loader as config_loader
 # from src.data_cleaner import clean_dataframe, get_cleaning_summary
 # from src.data_loader import reshape_to_long_format, load_csv, extract_years_range
 from plugins.inputs import JsonReader, CsvReader
+from plugins.outputs import ConsoleWriter, GraphicsChartWriter
 from core.engine import TransformationEngine
 
 
 
 INPUT_DRIVERS = {"json": JsonReader, "csv": CsvReader}
-OUTPUT_DRIVERS = {"console": ConsoleWriter, "file": GraphicsChartWriter}
+OUTPUT_DRIVERS = {"console": ConsoleWriter, "graphics": GraphicsChartWriter}
 
 
 # def bootstrap():
