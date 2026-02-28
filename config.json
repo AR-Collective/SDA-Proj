@@ -1,6 +1,7 @@
 {
   "scope": "continent",         
   "region": "Africa",           
+  "year": 2023,
   "year_start": 2020,           
   "year_end": 2023,             
   "limit": 10,                  

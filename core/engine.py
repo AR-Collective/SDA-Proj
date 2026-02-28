@@ -1,7 +1,7 @@
-import filter_engine as filter
-from cleaner_engine import clean_dataframe
-from melting_engine import reshape_to_long_format
-from contracts import DataSink, PipelineService
+from . import filter_engine as filter
+from .cleaner_engine import clean_dataframe
+from .melting_engine import reshape_to_long_format
+from .contracts import DataSink, PipelineService
 from typing import List, Any
 
 class TransformationEngine(PipelineService):
@@ -57,10 +57,10 @@ class TransformationEngine(PipelineService):
         )
         # MAIN
         top_10_gdp = (
-            df_by_country.nlargest(10, 'GDP')
+            df_by_country.nlargest(10, 'GDP_Value')
         )
         bottom_10_gdp = (
-            df_by_country.nsmallest(10, 'GDP')
+            df_by_country.nsmallest(10, 'GDP_Value')
         )
 
         ret_data = {

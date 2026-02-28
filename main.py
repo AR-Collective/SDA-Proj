@@ -10,15 +10,16 @@ SDA Project Phase 1 - Data Loading and Processing
 import traceback
 import sys
 # import src.data_filter as filter
-# import src.config_loader as config_loader
+import src.config_loader as config_loader
 # from src.data_cleaner import clean_dataframe, get_cleaning_summary
 # from src.data_loader import reshape_to_long_format, load_csv, extract_years_range
 from plugins.inputs import JsonReader, CsvReader
+from core.engine import TransformationEngine
 
 
 
 INPUT_DRIVERS = {"json": JsonReader, "csv": CsvReader}
-# OUTPUT_DRIVERS = {"console": ConsoleWriter, "file": GraphicsChartWriter}
+OUTPUT_DRIVERS = {"console": ConsoleWriter, "file": GraphicsChartWriter}
 
 
 # def bootstrap():
@@ -34,6 +35,56 @@ def print_section(title: str) -> None:
     print("\n" + "="*60)
     print(f"  {title}")
     print("="*60)
+
+
+
+def main():
+    filepath = "data/gdp_with_continent_filled.csv"
+
+    try:
+        print_section("SDA PROJECT PHASE 1 - Data Loading & Processing")
+        # TODO: ye data input mein jaye ga
+
+        df = INPUT_DRIVERS['csv'](filepath)
+        # df = load_csv(filepath)  # file read
+        config_array = config_loader.get_config_options()
+        d = TransformationEngine(OUTPUT_DRIVERS['console'])
+        d.execute(df, config_array)
+
+        # config_loader.validate_config(config_array, long_data)
+        #
+        # # TODO: YE OUTPUT MEIN JAYE GA
+        # run_dashboard(df_filters, config_array, df_clean)
+        # # TODO: Ye output mein jye ga
+        # print(get_cleaning_summary(df, df_clean))
+
+    except FileNotFoundError as e:
+        print(f"\n✗ File error: {e}")
+        sys.exit(1)
+    # except (KeyError, ValueError) as e:
+    #     print(f"\n✗ Configuration error: {e}")
+        # If data was loaded, help user by listing available regions and years
+        # if 'long_data' in locals():
+        #     try:
+        #         regions = sorted(
+        #             list(long_data['Continent'].dropna().unique()))
+        #         year_min, year_max = extract_years_range(long_data)
+        #         print('\nAvailable regions (sample):', regions[:20])
+        #         if year_min is not None and year_max is not None:
+        #             print(f'\nAvailable years: {year_min} - {year_max}')
+        #         else:
+        #             print('\nAvailable years: (none)')
+        #     except Exception:
+        #         pass
+        sys.exit(2)
+    except Exception as e:
+        print("\n✗ Unexpected error - full traceback below:")
+        traceback.print_exc()
+        sys.exit(99)
+
+
+if __name__ == "__main__":
+    main()
 
 
 # TODO: Ye Output mein jaye ga
@@ -62,50 +113,3 @@ def run_dashboard(df_context: dict, config_array: dict, df_clean):
     app.run()
     return
 
-
-def main():
-    filepath = "data/gdp_with_continent_filled.csv"
-
-    try:
-        print_section("SDA PROJECT PHASE 1 - Data Loading & Processing")
-        # TODO: ye data input mein jaye ga
-
-        df = INPUT_DRIVERS['csv'](filepath)
-        # df = load_csv(filepath)  # file read
-
-
-       # config_array = config_loader.get_config_options()
-       # config_loader.validate_config(config_array, long_data)
-       #
-       # # TODO: YE OUTPUT MEIN JAYE GA
-       # run_dashboard(df_filters, config_array, df_clean)
-       # # TODO: Ye output mein jye ga
-       # print(get_cleaning_summary(df, df_clean))
-
-    except FileNotFoundError as e:
-        print(f"\n✗ File error: {e}")
-        sys.exit(1)
-    except (KeyError, ValueError) as e:
-        print(f"\n✗ Configuration error: {e}")
-        # If data was loaded, help user by listing available regions and years
-        # if 'long_data' in locals():
-        #     try:
-        #         regions = sorted(
-        #             list(long_data['Continent'].dropna().unique()))
-        #         year_min, year_max = extract_years_range(long_data)
-        #         print('\nAvailable regions (sample):', regions[:20])
-        #         if year_min is not None and year_max is not None:
-        #             print(f'\nAvailable years: {year_min} - {year_max}')
-        #         else:
-        #             print('\nAvailable years: (none)')
-        #     except Exception:
-        #         pass
-        sys.exit(2)
-    except Exception as e:
-        print("\n✗ Unexpected error - full traceback below:")
-        traceback.print_exc()
-        sys.exit(99)
-
-
-if __name__ == "__main__":
-    main()
