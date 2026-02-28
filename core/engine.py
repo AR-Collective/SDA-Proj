@@ -63,8 +63,38 @@ class TransformationEngine(PipelineService):
             df_by_country.nsmallest(10, 'GDP_Value')
         )
 
+        # GDP Growth Rate of Each Country in the given continent for the given data range
+        gdp_growth_rate = self._calculate_growth_rate(
+            df_clean,
+            config_array['region'],
+            config_array['year_start'],
+            config_array['year_end']
+        )
+
         ret_data = {
             "top_10_gdp": top_10_gdp,
             "bottom_10_gdp": bottom_10_gdp,
+            "gdp_growth_rate": gdp_growth_rate,
         }
         self.sink.write(ret_data)
+
+    def _calculate_growth_rate(self, df, region, year_start, year_end):
+        """
+        Calculate GDP growth rate for each country in a region between two years.
+        Growth Rate = ((End_Value - Start_Value) / Start_Value) * 100
+        """
+        region_data = df.pipe(filter.region, region)
+
+        # Get data for start and end years
+        start_data = region_data.pipe(filter.year, year_start)[['Country Name', 'GDP_Value']].rename(columns={'GDP_Value': 'GDP_Start'})
+        end_data = region_data.pipe(filter.year, year_end)[['Country Name', 'GDP_Value']].rename(columns={'GDP_Value': 'GDP_End'})
+
+        # Merge start and end data
+        merged = start_data.merge(end_data, on='Country Name', how='inner')
+
+        # Calculate growth rate
+        merged['Growth_Rate_%'] = ((merged['GDP_End'] - merged['GDP_Start']) / merged['GDP_Start'] * 100).round(2)
+
+        # Sort by growth rate descending
+        result = merged.sort_values('Growth_Rate_%', ascending=False)[['Country Name', 'GDP_Start', 'GDP_End', 'Growth_Rate_%']]
+        return result
