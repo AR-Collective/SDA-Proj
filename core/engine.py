@@ -78,11 +78,19 @@ class TransformationEngine(PipelineService):
             config_array['year_end']
         )
 
+        # Total Global GDP Trend for given date range
+        global_gdp_trend = self._calculate_global_gdp_trend(
+            df_clean,
+            config_array['year_start'],
+            config_array['year_end']
+        )
+
         ret_data = {
             "top_10_gdp": top_10_gdp,
             "bottom_10_gdp": bottom_10_gdp,
             "gdp_growth_rate": gdp_growth_rate,
             "avg_gdp_by_continent": avg_gdp_by_continent,
+            "global_gdp_trend": global_gdp_trend,
         }
         self.sink.write(ret_data)
 
@@ -130,3 +138,35 @@ class TransformationEngine(PipelineService):
         )
 
         return avg_by_continent
+
+    def _calculate_global_gdp_trend(self, df, year_start, year_end):
+        """
+        Calculate total global GDP trend over the years in the given range.
+        Returns Year and Total_GDP sorted by year ascending.
+        """
+        # Filter for Global entries within the year range
+        global_data = df[
+            (df['Continent'] == 'Global') &
+            (df['Year'] >= year_start) &
+            (df['Year'] <= year_end)
+        ]
+
+        # If no Global entries, sum all country data by year
+        if global_data.empty:
+            global_data = df[
+                (df['Year'] >= year_start) &
+                (df['Year'] <= year_end)
+            ]
+            trend = (
+                global_data
+                .groupby('Year')['GDP_Value']
+                .sum()
+                .reset_index()
+                .rename(columns={'GDP_Value': 'Total_GDP'})
+            )
+        else:
+            trend = global_data[['Year', 'GDP_Value']].rename(columns={'GDP_Value': 'Total_GDP'})
+
+        # Sort by year ascending
+        trend = trend.sort_values('Year', ascending=True).round(2)
+        return trend
