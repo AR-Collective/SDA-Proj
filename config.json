@@ -1,11 +1,13 @@
 {
-  "scope": "continent",         
-  "region": "Africa",           
+  "input_format": "csv",
+  "filepath": "data/gdp_with_continent_filled.csv",
+  "output_format": "graphics",
+  "scope": "continent",
+  "region": "Africa",
   "year": 2023,
-  "year_start": 2020,           
-  "year_end": 2023,             
-  "limit": 10,                  
-  "trend_window_years": 5,      
-  "operation": "growth_rate",   
-  "output_format": "dashboard"  
+  "year_start": 2020,
+  "year_end": 2023,
+  "limit": 10,
+  "trend_window_years": 5,
+  "operation": "growth_rate"
 }
