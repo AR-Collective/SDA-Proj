@@ -118,7 +118,7 @@ class TransformationEngine(PipelineService):
             "countries_with_consistent_decline": countries_with_decline,
             "continent_contribution": continent_contribution,
         }
-        self.sink.write(ret_data)
+        self.sink.write(ret_data, config_array)
 
     def _calculate_growth_rate(self, df, region, year_start, year_end):
         """

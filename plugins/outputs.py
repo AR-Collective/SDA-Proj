@@ -1,7 +1,9 @@
 from typing import Any, List
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from src import graphs
+from src.ui.dashboard import DashboardApp
 
 
 class ConsoleWriter:
@@ -10,13 +12,14 @@ class ConsoleWriter:
     Implements the DataSink protocol from core/contracts.py
     """
 
-    def write(self, records: Any) -> None:
+    def write(self, records: Any, config: dict = None) -> None:
         """
         Write records to console with nice formatting.
         Handles both dict with DataFrames and List[dict].
 
         Args:
             records: Data to write (can be dict with DataFrames or List[dict])
+            config: Configuration dictionary (optional)
         """
         if isinstance(records, dict):
             self._write_dict(records)
@@ -51,9 +54,10 @@ class ConsoleWriter:
 
 class GraphicsChartWriter:
     """
-    Writes data as visual charts and graphs.
+    Creates a comprehensive dashboard with 8 pages of visualizations.
     Implements the DataSink protocol from core/contracts.py
-    Creates and displays matplotlib figures with various chart types.
+    Uses DashboardApp to display all charts in a single window with page navigation.
+    Navigate using LEFT/RIGHT arrow keys.
     """
 
     def __init__(self, save_path: str = None):
@@ -61,104 +65,280 @@ class GraphicsChartWriter:
         Initialize the GraphicsChartWriter.
 
         Args:
-            save_path: Optional path to save charts as images. If None, displays them instead.
+            save_path: Optional path to save charts as images. (Not implemented for DashboardApp)
         """
         self.save_path = save_path
-        self.figure_count = 0
+        self.app = None
 
-    def write(self, records: Any) -> None:
+    def write(self, records: Any, config: dict = None) -> None:
         """
-        Write records as visual graphics.
-        Handles dict with DataFrames and creates appropriate visualizations.
+        Write records as visual dashboard with 8 pages.
+        Each page contains one graph for each output calculation.
 
         Args:
-            records: Data to visualize (dict with DataFrames)
+            records: Dictionary with 8 DataFrames (one per analysis output)
+            config: Configuration dictionary for dynamic titles and parameters
         """
         if isinstance(records, dict):
-            self._write_graphics(records)
+            self.config = config or {}
+            self._create_dashboard(records)
         else:
-            print(f"GraphicsChartWriter: Cannot visualize non-dict data. Received: {type(records)}")
+            print(f"GraphicsChartWriter: Expected dict, got {type(records)}")
 
-    def _write_graphics(self, data: dict) -> None:
+    def _create_dashboard(self, data: dict) -> None:
         """
-        Create visualizations for dictionary of DataFrames.
+        Create a multi-page dashboard with all visualizations.
 
         Args:
             data: Dictionary with keys like 'top_10_gdp', 'bottom_10_gdp', etc.
         """
-        for key, df in data.items():
-            if not isinstance(df, pd.DataFrame) or df.empty:
-                continue
+        self.app = DashboardApp()
 
-            self.figure_count += 1
-            self._create_chart_for_key(key, df)
+        # Get config values with defaults
+        year = self.config.get('year', 2023)
+        year_start = self.config.get('year_start', 2020)
+        year_end = self.config.get('year_end', 2023)
+        region = self.config.get('region', 'Africa')
 
-        if not self.save_path:
-            plt.show()
+        # Page 1: Top 10 Countries by GDP
+        if 'top_10_gdp' in data and not data['top_10_gdp'].empty:
+            p1 = self.app.add_new_page(f"Top 10 Countries by GDP ({year})")
+            self.app.add_element(p1, self._graph_top_10_gdp, data['top_10_gdp'])
 
-    def _create_chart_for_key(self, key: str, df: pd.DataFrame) -> None:
+        # Page 2: Bottom 10 Countries by GDP
+        if 'bottom_10_gdp' in data and not data['bottom_10_gdp'].empty:
+            p2 = self.app.add_new_page(f"Bottom 10 Countries by GDP ({year})")
+            self.app.add_element(p2, self._graph_bottom_10_gdp, data['bottom_10_gdp'])
+
+        # Page 3: GDP Growth Rate
+        if 'gdp_growth_rate' in data and not data['gdp_growth_rate'].empty:
+            p3 = self.app.add_new_page(f"GDP Growth Rate by Country ({year_start}-{year_end})")
+            self.app.add_element(p3, self._graph_gdp_growth_rate, data['gdp_growth_rate'])
+
+        # Page 4: Average GDP by Continent
+        if 'avg_gdp_by_continent' in data and not data['avg_gdp_by_continent'].empty:
+            p4 = self.app.add_new_page(f"Average GDP by Continent ({year_start}-{year_end})")
+            self.app.add_element(p4, self._graph_avg_gdp_by_continent, data['avg_gdp_by_continent'])
+
+        # Page 5: Global GDP Trend
+        if 'global_gdp_trend' in data and not data['global_gdp_trend'].empty:
+            p5 = self.app.add_new_page(f"Total Global GDP Trend ({year_start}-{year_end})")
+            self.app.add_element(p5, self._graph_global_gdp_trend, data['global_gdp_trend'])
+
+        # Page 6: Fastest Growing Continent
+        if 'fastest_growing_continent' in data and not data['fastest_growing_continent'].empty:
+            p6 = self.app.add_new_page(f"Fastest Growing Continents ({year_start}-{year_end})")
+            self.app.add_element(p6, self._graph_fastest_growing_continent, data['fastest_growing_continent'])
+
+        # Page 7: Countries with Consistent Decline
+        if 'countries_with_consistent_decline' in data and not data['countries_with_consistent_decline'].empty:
+            p7 = self.app.add_new_page(f"Countries with Consistent GDP Decline ({region})")
+            self.app.add_element(p7, self._graph_countries_with_decline, data['countries_with_consistent_decline'])
+
+        # Page 8: Continent Contribution to Global GDP
+        if 'continent_contribution' in data and not data['continent_contribution'].empty:
+            p8 = self.app.add_new_page(f"Continent Contribution to Global GDP ({year_start}-{year_end})")
+            self.app.add_element(p8, self._graph_continent_contribution, data['continent_contribution'])
+
+        # Run the dashboard
+        self.app.run()
+
+    def _graph_top_10_gdp(self, df: pd.DataFrame, ax) -> None:
         """
-        Create appropriate chart based on the data key and structure.
-
-        Args:
-            key: The data key (e.g., 'top_10_gdp')
-            df: The DataFrame to visualize
+        Graph 1: Top 10 Countries by GDP
+        Horizontal bar chart showing the wealthiest countries.
         """
-        plt.figure(figsize=(12, 6))
+        df_plot = df.copy().sort_values('GDP_Value', ascending=True)
 
-        if 'top_10' in key.lower() or 'bottom_10' in key.lower():
-            self._create_bar_chart(df, key)
-        elif 'by_continent' in key.lower() or 'contribution' in key.lower():
-            self._create_donut_chart(df, key)
-        elif 'trend' in key.lower() or 'growth' in key.lower():
-            self._create_line_chart(df, key)
-        else:
-            self._create_default_chart(df, key)
+        colors = plt.cm.Greens(range(len(df_plot)))
+        bars = ax.barh(df_plot['Country Name'], df_plot['GDP_Value'], color=colors, edgecolor='darkgreen', linewidth=1.2)
 
-        if self.save_path:
-            filename = f"{self.save_path}/{key}_chart.png"
-            plt.savefig(filename, dpi=300, bbox_inches='tight')
-            print(f"✓ Saved chart: {filename}")
-            plt.close()
+        # Add value labels on bars
+        for i, (idx, row) in enumerate(df_plot.iterrows()):
+            value = row['GDP_Value']
+            ax.text(value, i, f' ${value:,.0f}B', va='center', fontweight='bold', fontsize=9)
 
-    def _create_bar_chart(self, df: pd.DataFrame, title: str) -> None:
-        """Create a horizontal bar chart for top/bottom rankings."""
-        if 'Country Name' in df.columns and 'GDP_Value' in df.columns:
-            df_sorted = df.sort_values('GDP_Value')
-            plt.barh(df_sorted['Country Name'], df_sorted['GDP_Value'], color='steelblue')
-            plt.xlabel('GDP Value', fontweight='bold')
-            plt.ylabel('Country', fontweight='bold')
-            plt.title(title.replace('_', ' ').title(), fontsize=14, fontweight='bold', pad=15)
-            plt.tight_layout()
+        year = self.config.get('year', 2023)
 
-    def _create_donut_chart(self, df: pd.DataFrame, title: str) -> None:
-        """Create a donut chart for continent or region contributions."""
-        if 'Continent' in df.columns and 'GDP_Value' in df.columns:
-            plt.figure(figsize=(10, 8))
-            graphs.donutplot(df, 'GDP_Value', 'Continent',
-                           title=title.replace('_', ' ').title())
-        elif 'Country Name' in df.columns and 'GDP_Value' in df.columns:
-            plt.figure(figsize=(10, 8))
-            graphs.donutplot(df.head(10), 'GDP_Value', 'Country Name',
-                           title=title.replace('_', ' ').title())
+        ax.set_xlabel('GDP Value (Billions USD)', fontweight='bold', fontsize=11)
+        ax.set_ylabel('Country', fontweight='bold', fontsize=11)
+        ax.grid(axis='x', alpha=0.3, linestyle='--')
+        ax.invert_yaxis()
 
-    def _create_line_chart(self, df: pd.DataFrame, title: str) -> None:
-        """Create a line chart for trends over time."""
-        if 'Year' in df.columns and 'GDP_Value' in df.columns:
-            plt.figure(figsize=(12, 6))
-            graphs.line_plot(df, 'Year', 'GDP_Value', plt.gca())
-            plt.tight_layout()
+    def _graph_bottom_10_gdp(self, df: pd.DataFrame, ax) -> None:
+        """
+        Graph 2: Bottom 10 Countries by GDP
+        Horizontal bar chart showing the least wealthy countries.
+        """
+        df_plot = df.copy().sort_values('GDP_Value', ascending=True)
 
-    def _create_default_chart(self, df: pd.DataFrame, title: str) -> None:
-        """Create a simple bar chart as fallback for unknown data."""
-        if len(df.columns) >= 2:
-            label_col = df.columns[0]
-            value_col = df.columns[1]
+        colors = plt.cm.Reds(range(len(df_plot)))
+        bars = ax.barh(df_plot['Country Name'], df_plot['GDP_Value'], color=colors, edgecolor='darkred', linewidth=1.2)
 
-            if pd.api.types.is_numeric_dtype(df[value_col]):
-                df_sorted = df.sort_values(value_col)
-                plt.bar(range(len(df_sorted)), df_sorted[value_col], color='coral')
-                plt.xticks(range(len(df_sorted)), df_sorted[label_col], rotation=45, ha='right')
-                plt.ylabel(value_col, fontweight='bold')
-                plt.title(title.replace('_', ' ').title(), fontsize=14, fontweight='bold', pad=15)
-                plt.tight_layout()
+        # Add value labels on bars
+        for i, (idx, row) in enumerate(df_plot.iterrows()):
+            value = row['GDP_Value']
+            ax.text(value, i, f' ${value:,.0f}B', va='center', fontweight='bold', fontsize=9)
+
+        year = self.config.get('year', 2023)
+
+        ax.set_xlabel('GDP Value (Billions USD)', fontweight='bold', fontsize=11)
+        ax.set_ylabel('Country', fontweight='bold', fontsize=11)
+        ax.grid(axis='x', alpha=0.3, linestyle='--')
+        ax.invert_yaxis()
+
+    def _graph_gdp_growth_rate(self, df: pd.DataFrame, ax) -> None:
+        """
+        Graph 3: GDP Growth Rate by Country
+        Vertical bar chart showing growth percentage for each country.
+        """
+        df_plot = df.copy().sort_values('Growth_Rate_%', ascending=False).head(10)
+
+        colors = ['green' if x > 0 else 'red' for x in df_plot['Growth_Rate_%']]
+        bars = ax.bar(range(len(df_plot)), df_plot['Growth_Rate_%'], color=colors, edgecolor='black', linewidth=1.2, alpha=0.8)
+
+        # Add value labels on bars
+        for i, (idx, row) in enumerate(df_plot.iterrows()):
+            value = row['Growth_Rate_%']
+            ax.text(i, value, f'{value:.1f}%', ha='center', va='bottom' if value > 0 else 'top', fontweight='bold', fontsize=9)
+
+        year_start = self.config.get('year_start', 2020)
+        year_end = self.config.get('year_end', 2023)
+
+        ax.set_xticks(range(len(df_plot)))
+        ax.set_xticklabels(df_plot['Country Name'], rotation=45, ha='right', fontsize=9)
+        ax.set_ylabel('Growth Rate (%)', fontweight='bold', fontsize=11)
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+        ax.grid(axis='y', alpha=0.3, linestyle='--')
+
+    def _graph_avg_gdp_by_continent(self, df: pd.DataFrame, ax) -> None:
+        """
+        Graph 4: Average GDP by Continent
+        Donut chart showing average GDP distribution across continents.
+        """
+        import matplotlib.patches as mpatches
+
+        df_plot = df.copy().sort_values('Average_GDP', ascending=False)
+
+        colors = plt.cm.Set3(range(len(df_plot)))
+        wedges, texts, autotexts = ax.pie(
+            df_plot['Average_GDP'],
+            labels=df_plot['Continent'],
+            autopct='%1.1f%%',
+            startangle=140,
+            colors=colors,
+            pctdistance=0.85,
+            explode=[0.05] * len(df_plot),
+            textprops={'fontweight': 'bold', 'fontsize': 10}
+        )
+
+        # Donut hole
+        centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+        ax.add_artist(centre_circle)
+        ax.axis('equal')
+
+        # Add legend with values
+        legend_labels = [f'{cont}: ${val:,.0f}B' for cont, val in zip(df_plot['Continent'], df_plot['Average_GDP'])]
+        ax.legend(legend_labels, loc='upper center', bbox_to_anchor=(1.1, 1), fontsize=9, frameon=True)
+
+    def _graph_global_gdp_trend(self, df: pd.DataFrame, ax) -> None:
+        """
+        Graph 5: Global GDP Trend
+        Bar chart showing total global GDP by year.
+        """
+        df_plot = df.copy().sort_values('Year', ascending=True)
+
+        # Create bar chart with gradient colors
+        colors = plt.cm.Blues(np.linspace(0.4, 0.9, len(df_plot)))
+        bars = ax.bar(df_plot['Year'], df_plot['Total_GDP'], color=colors, edgecolor='darkblue', linewidth=1.2, alpha=0.8)
+
+        year_start = self.config.get('year_start', 2020)
+        year_end = self.config.get('year_end', 2023)
+
+        ax.set_xlabel('Year', fontweight='bold', fontsize=11)
+        ax.set_ylabel('Total GDP (Billions USD)', fontweight='bold', fontsize=11)
+        ax.set_xticks(df_plot['Year'].unique())
+        ax.grid(axis='y', alpha=0.3, linestyle='--')
+
+    def _graph_fastest_growing_continent(self, df: pd.DataFrame, ax) -> None:
+        """
+        Graph 6: Fastest Growing Continents
+        Vertical bar chart showing growth rate percentage for each continent.
+        """
+        df_plot = df.copy().sort_values('Growth_Rate_%', ascending=False)
+
+        colors = ['green' if x > 0 else 'red' for x in df_plot['Growth_Rate_%']]
+        bars = ax.bar(range(len(df_plot)), df_plot['Growth_Rate_%'], color=colors, edgecolor='black', linewidth=1.2, alpha=0.8)
+
+        # Add value labels on bars
+        for i, (idx, row) in enumerate(df_plot.iterrows()):
+            value = row['Growth_Rate_%']
+            ax.text(i, value, f'{value:.1f}%', ha='center', va='bottom' if value > 0 else 'top', fontweight='bold', fontsize=10)
+
+        year_start = self.config.get('year_start', 2020)
+        year_end = self.config.get('year_end', 2023)
+
+        ax.set_xticks(range(len(df_plot)))
+        ax.set_xticklabels(df_plot['Continent'], rotation=45, ha='right', fontsize=10)
+        ax.set_ylabel('Growth Rate (%)', fontweight='bold', fontsize=11)
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=1)
+        ax.grid(axis='y', alpha=0.3, linestyle='--')
+
+    def _graph_countries_with_decline(self, df: pd.DataFrame, ax) -> None:
+        """
+        Graph 7: Countries with Consistent GDP Decline
+        Horizontal bar chart showing decline rate percentage for each country.
+        """
+        if df.empty:
+            region = self.config.get('region', 'Africa')
+            ax.text(0.5, 0.5, 'No countries with consistent decline', ha='center', va='center',
+                   fontsize=12, fontweight='bold', transform=ax.transAxes)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            return
+
+        df_plot = df.copy().sort_values('Decline_Rate_%', ascending=True)
+
+        colors = plt.cm.Oranges(np.linspace(0.4, 0.9, len(df_plot)))
+        bars = ax.barh(df_plot['Country Name'], df_plot['Decline_Rate_%'], color=colors, edgecolor='darkorange', linewidth=1.2)
+
+        # Add value labels on bars
+        for i, (idx, row) in enumerate(df_plot.iterrows()):
+            value = row['Decline_Rate_%']
+            ax.text(value, i, f' {value:.1f}%', va='center', fontweight='bold', fontsize=9)
+
+        region = self.config.get('region', 'Africa')
+
+        ax.set_xlabel('Decline Rate (%)', fontweight='bold', fontsize=11)
+        ax.set_ylabel('Country', fontweight='bold', fontsize=11)
+        ax.grid(axis='x', alpha=0.3, linestyle='--')
+        ax.invert_yaxis()
+
+    def _graph_continent_contribution(self, df: pd.DataFrame, ax) -> None:
+        """
+        Graph 8: Continent Contribution to Global GDP
+        Donut chart showing each continent's percentage contribution to total global GDP.
+        """
+        df_plot = df.copy().sort_values('Contribution_%', ascending=False)
+
+        colors = plt.cm.Pastel1(range(len(df_plot)))
+        wedges, texts, autotexts = ax.pie(
+            df_plot['Contribution_%'],
+            labels=df_plot['Continent'],
+            autopct='%1.1f%%',
+            startangle=90,
+            colors=colors,
+            pctdistance=0.85,
+            explode=[0.05] * len(df_plot),
+            textprops={'fontweight': 'bold', 'fontsize': 10}
+        )
+
+        # Donut hole
+        centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+        ax.add_artist(centre_circle)
+        ax.axis('equal')
+
+        # Add legend with GDP values
+        legend_labels = [f'{cont}: ${val:,.0f}B' for cont, val in zip(df_plot['Continent'], df_plot['Total_GDP'])]
+        ax.legend(legend_labels, loc='upper center', bbox_to_anchor=(1.1, 1), fontsize=9, frameon=True)
+

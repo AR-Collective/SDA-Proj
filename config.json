@@ -5,9 +5,9 @@
   "scope": "continent",
   "region": "Africa",
   "year": 2023,
-  "year_start": 2020,
+  "year_start": 2018,
   "year_end": 2023,
   "limit": 10,
-  "trend_window_years": 5,
+  "trend_window_years": 7,
   "operation": "growth_rate"
 }
