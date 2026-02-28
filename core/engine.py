@@ -71,10 +71,18 @@ class TransformationEngine(PipelineService):
             config_array['year_end']
         )
 
+        # Average GDP by Continent for given date range
+        avg_gdp_by_continent = self._calculate_average_gdp_by_continent(
+            df_clean,
+            config_array['year_start'],
+            config_array['year_end']
+        )
+
         ret_data = {
             "top_10_gdp": top_10_gdp,
             "bottom_10_gdp": bottom_10_gdp,
             "gdp_growth_rate": gdp_growth_rate,
+            "avg_gdp_by_continent": avg_gdp_by_continent,
         }
         self.sink.write(ret_data)
 
@@ -98,3 +106,27 @@ class TransformationEngine(PipelineService):
         # Sort by growth rate descending
         result = merged.sort_values('Growth_Rate_%', ascending=False)[['Country Name', 'GDP_Start', 'GDP_End', 'Growth_Rate_%']]
         return result
+
+    def _calculate_average_gdp_by_continent(self, df, year_start, year_end):
+        """
+        Calculate average GDP for each continent within the given year range.
+        Returns continents sorted by average GDP descending.
+        """
+        # Filter data between year_start and year_end
+        year_filtered = df[
+            (df['Year'] >= year_start) & (df['Year'] <= year_end)
+        ]
+
+        # Group by continent and calculate average GDP
+        avg_by_continent = (
+            year_filtered
+            .groupby('Continent')['GDP_Value']
+            .mean()
+            .reset_index()
+            .rename(columns={'GDP_Value': 'Average_GDP'})
+            .query("Continent != 'Global'")
+            .sort_values('Average_GDP', ascending=False)
+            .round(2)
+        )
+
+        return avg_by_continent
