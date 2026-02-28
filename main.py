@@ -35,6 +35,7 @@ def print_section(title: str) -> None:
     print("="*60)
 
 
+# TODO: Ye Output mein jaye ga
 def run_dashboard(df_context: dict, config_array: dict, df_clean):
     app = DashboardApp()
 
@@ -66,58 +67,16 @@ def main():
 
     try:
         print_section("SDA PROJECT PHASE 1 - Data Loading & Processing")
+        # TODO: ye data input mein jaye ga
         df = load_csv(filepath)  # file read
-        long_data = reshape_to_long_format(df)
 
         config_array = config_loader.get_config_options()
         config_loader.validate_config(config_array, long_data)
 
-        df_clean = clean_dataframe(
-            long_data,
-            handle_missing=True,
-            missing_strategy='mean',  # Using mean strategy
-            remove_duplicates=True
-        )
-
-        print(get_cleaning_summary(df, df_clean))
-
-        df_by_region = (
-            df_clean
-            .pipe(filter.year, config_array['year'])
-            .pipe(
-                filter.accumulate,
-                config_array,
-                accumulate_by='Continent'
-            )
-            .query("Continent != 'Global'")
-        )
-        df_by_year = (
-            df_clean
-            .pipe(filter.region, config_array['region'])
-            .pipe(
-                filter.accumulate,
-                config_array,
-                accumulate_by='Year'
-            )
-        )
-
-        df_by_continent = (
-            df_clean
-            .pipe(
-                filter.accumulate,
-                config_array,
-                accumulate_by='Continent'
-            )
-        )
-
-        df_by_country = (
-            df_clean
-            .pipe(filter.region, config_array['region'])
-            .pipe(filter.year, config_array['year'])
-        )
-        df_filters = {"df_by_region": df_by_region,
-                      "df_by_year": df_by_year, "df_by_continent": df_by_continent, "df_by_country": df_by_country}
+        # TODO: YE OUTPUT MEIN JAYE GA
         run_dashboard(df_filters, config_array, df_clean)
+        # TODO: Ye output mein jye ga
+        print(get_cleaning_summary(df, df_clean))
 
     except FileNotFoundError as e:
         print(f"\n✗ File error: {e}")

@@ -1,6 +1,10 @@
 {
-  "region": "Africa",
-  "year": 2023,
-  "operation": "average",
-  "output": "dashboard"
+  "scope": "continent",         
+  "region": "Africa",           
+  "year_start": 2020,           
+  "year_end": 2023,             
+  "limit": 10,                  
+  "trend_window_years": 5,      
+  "operation": "growth_rate",   
+  "output_format": "dashboard"  
 }
