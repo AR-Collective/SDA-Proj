@@ -8,19 +8,6 @@ from typing import Dict, List, Tuple
 from functools import reduce
 
 
-def load_csv(filepath: str) -> pd.DataFrame:
-    """
-    CSV load krke usko dataframe mein convert
-    """
-
-    try:
-        return pd.read_csv(filepath)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"CSV file not found at {filepath}")
-
-
-
-
 # TODO: YE DUPPLICATED FUNCTION HAI, ye remove hona but abhi data_info iss pr depend kr rha
 # TODO: correct location in core/melting_engine.py
 def get_year_columns(df: pd.DataFrame) -> List[str]:
