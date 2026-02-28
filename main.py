@@ -73,13 +73,14 @@ def main():
         df = INPUT_DRIVERS['csv'](filepath)
         # df = load_csv(filepath)  # file read
 
-        # config_array = config_loader.get_config_options()
-        # config_loader.validate_config(config_array, long_data)
-        #
-        # # TODO: YE OUTPUT MEIN JAYE GA
-        # run_dashboard(df_filters, config_array, df_clean)
-        # # TODO: Ye output mein jye ga
-        # print(get_cleaning_summary(df, df_clean))
+
+       # config_array = config_loader.get_config_options()
+       # config_loader.validate_config(config_array, long_data)
+       #
+       # # TODO: YE OUTPUT MEIN JAYE GA
+       # run_dashboard(df_filters, config_array, df_clean)
+       # # TODO: Ye output mein jye ga
+       # print(get_cleaning_summary(df, df_clean))
 
     except FileNotFoundError as e:
         print(f"\n✗ File error: {e}")
