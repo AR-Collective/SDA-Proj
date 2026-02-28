@@ -85,12 +85,20 @@ class TransformationEngine(PipelineService):
             config_array['year_end']
         )
 
+        # Fastest Growing Continent for the given date range
+        fastest_growing_continent = self._calculate_fastest_growing_continent(
+            df_clean,
+            config_array['year_start'],
+            config_array['year_end']
+        )
+
         ret_data = {
             "top_10_gdp": top_10_gdp,
             "bottom_10_gdp": bottom_10_gdp,
             "gdp_growth_rate": gdp_growth_rate,
             "avg_gdp_by_continent": avg_gdp_by_continent,
             "global_gdp_trend": global_gdp_trend,
+            "fastest_growing_continent": fastest_growing_continent,
         }
         self.sink.write(ret_data)
 
@@ -170,3 +178,44 @@ class TransformationEngine(PipelineService):
         # Sort by year ascending
         trend = trend.sort_values('Year', ascending=True).round(2)
         return trend
+
+    def _calculate_fastest_growing_continent(self, df, year_start, year_end):
+        """
+        Calculate which continent has the highest growth rate between two years.
+        Growth Rate = ((End_GDP - Start_GDP) / Start_GDP) * 100
+        Returns continents sorted by growth rate descending.
+        """
+        # Get data for start and end years, group by continent
+        start_data = (
+            df[df['Year'] == year_start]
+            .groupby('Continent')['GDP_Value']
+            .sum()
+            .reset_index()
+            .rename(columns={'GDP_Value': 'GDP_Start'})
+        )
+
+        end_data = (
+            df[df['Year'] == year_end]
+            .groupby('Continent')['GDP_Value']
+            .sum()
+            .reset_index()
+            .rename(columns={'GDP_Value': 'GDP_End'})
+        )
+
+        # Merge start and end data
+        merged = start_data.merge(end_data, on='Continent', how='inner')
+
+        # Calculate growth rate
+        merged['Growth_Rate_%'] = (
+            ((merged['GDP_End'] - merged['GDP_Start']) / merged['GDP_Start'] * 100)
+            .round(2)
+        )
+
+        # Filter out Global and sort by growth rate descending
+        result = (
+            merged
+            .query("Continent != 'Global'")
+            .sort_values('Growth_Rate_%', ascending=False)[['Continent', 'GDP_Start', 'GDP_End', 'Growth_Rate_%']]
+        )
+
+        return result
