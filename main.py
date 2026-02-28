@@ -4,28 +4,29 @@ SDA Project Phase 1 - Data Loading and Processing
 """
 
 
-import src.graphs as graphs
-from src.ui.dashboard import DashboardApp
-from src.ui.summary_plugin import text_stats_element
+# import src.graphs as graphs
+# from src.ui.dashboard import DashboardApp
+# from src.ui.summary_plugin import text_stats_element
 import traceback
 import sys
-import src.data_filter as filter
-import src.config_loader as config_loader
-from src.data_cleaner import clean_dataframe, get_cleaning_summary
-from src.data_loader import reshape_to_long_format, load_csv, extract_years_range
+# import src.data_filter as filter
+# import src.config_loader as config_loader
+# from src.data_cleaner import clean_dataframe, get_cleaning_summary
+# from src.data_loader import reshape_to_long_format, load_csv, extract_years_range
+from plugins.inputs import JsonReader, CsvReader
 
 
 
 INPUT_DRIVERS = {"json": JsonReader, "csv": CsvReader}
-OUTPUT_DRIVERS = {"console": ConsoleWriter, "file": GraphicsChartWriter}
+# OUTPUT_DRIVERS = {"console": ConsoleWriter, "file": GraphicsChartWriter}
 
 
-def bootstrap():
-    # 1. Load config.json
-    # 2. Instantiate Output (the Sink)
-    # 3. Instantiate Core (inject the Sink)
-    # 4. Instantiate Input (inject the Core)
-    # 5. Run the Input
+# def bootstrap():
+#     # 1. Load config.json
+#     # 2. Instantiate Output (the Sink)
+#     # 3. Instantiate Core (inject the Sink)
+#     # 4. Instantiate Input (inject the Core)
+#     # 5. Run the Input
 
 
 def print_section(title: str) -> None:
@@ -63,20 +64,22 @@ def run_dashboard(df_context: dict, config_array: dict, df_clean):
 
 
 def main():
-    filepath = "gdp_with_continent_filled.csv"
+    filepath = "data/gdp_with_continent_filled.csv"
 
     try:
         print_section("SDA PROJECT PHASE 1 - Data Loading & Processing")
         # TODO: ye data input mein jaye ga
-        df = load_csv(filepath)  # file read
 
-        config_array = config_loader.get_config_options()
-        config_loader.validate_config(config_array, long_data)
+        df = INPUT_DRIVERS['csv'](filepath)
+        # df = load_csv(filepath)  # file read
 
-        # TODO: YE OUTPUT MEIN JAYE GA
-        run_dashboard(df_filters, config_array, df_clean)
-        # TODO: Ye output mein jye ga
-        print(get_cleaning_summary(df, df_clean))
+        # config_array = config_loader.get_config_options()
+        # config_loader.validate_config(config_array, long_data)
+        #
+        # # TODO: YE OUTPUT MEIN JAYE GA
+        # run_dashboard(df_filters, config_array, df_clean)
+        # # TODO: Ye output mein jye ga
+        # print(get_cleaning_summary(df, df_clean))
 
     except FileNotFoundError as e:
         print(f"\n✗ File error: {e}")
@@ -84,18 +87,18 @@ def main():
     except (KeyError, ValueError) as e:
         print(f"\n✗ Configuration error: {e}")
         # If data was loaded, help user by listing available regions and years
-        if 'long_data' in locals():
-            try:
-                regions = sorted(
-                    list(long_data['Continent'].dropna().unique()))
-                year_min, year_max = extract_years_range(long_data)
-                print('\nAvailable regions (sample):', regions[:20])
-                if year_min is not None and year_max is not None:
-                    print(f'\nAvailable years: {year_min} - {year_max}')
-                else:
-                    print('\nAvailable years: (none)')
-            except Exception:
-                pass
+        # if 'long_data' in locals():
+        #     try:
+        #         regions = sorted(
+        #             list(long_data['Continent'].dropna().unique()))
+        #         year_min, year_max = extract_years_range(long_data)
+        #         print('\nAvailable regions (sample):', regions[:20])
+        #         if year_min is not None and year_max is not None:
+        #             print(f'\nAvailable years: {year_min} - {year_max}')
+        #         else:
+        #             print('\nAvailable years: (none)')
+        #     except Exception:
+        #         pass
         sys.exit(2)
     except Exception as e:
         print("\n✗ Unexpected error - full traceback below:")
