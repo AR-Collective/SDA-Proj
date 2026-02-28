@@ -6,7 +6,7 @@ class DataSink(Protocol):
     Outbound Abstraction: The Core calls this to save data.
     Any Output module must implement this method signature.
     """
-    def write(self, records: List[dict]) -> None:
+    def write(self, records: List[dict], config: dict = None) -> None:
         ...
 
 class PipelineService(Protocol):
