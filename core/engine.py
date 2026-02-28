@@ -101,6 +101,13 @@ class TransformationEngine(PipelineService):
             config_array.get('trend_window_years', 5)
         )
 
+        # Contribution of Each Continent to Global GDP for given data range
+        continent_contribution = self._calculate_continent_contribution(
+            df_clean,
+            config_array['year_start'],
+            config_array['year_end']
+        )
+
         ret_data = {
             "top_10_gdp": top_10_gdp,
             "bottom_10_gdp": bottom_10_gdp,
@@ -109,6 +116,7 @@ class TransformationEngine(PipelineService):
             "global_gdp_trend": global_gdp_trend,
             "fastest_growing_continent": fastest_growing_continent,
             "countries_with_consistent_decline": countries_with_decline,
+            "continent_contribution": continent_contribution,
         }
         self.sink.write(ret_data)
 
@@ -292,5 +300,45 @@ class TransformationEngine(PipelineService):
             .sort_values('Decline_Rate_%', ascending=False)
             if decline_data else pd.DataFrame()
         )
+
+        return result
+
+    def _calculate_continent_contribution(self, df, year_start, year_end):
+        """
+        Calculate the contribution of each continent to global GDP as a percentage.
+        Shows what percentage each continent contributes to the total global GDP.
+
+        Args:
+            df: Clean dataframe
+            year_start: Start year for the range
+            year_end: End year for the range
+        """
+        # Filter data for the year range
+        year_filtered = df[
+            (df['Year'] >= year_start) &
+            (df['Year'] <= year_end)
+        ]
+
+        # Calculate total GDP by continent (sum across all years in range)
+        continent_gdp = (
+            year_filtered
+            .query("Continent != 'Global'")
+            .groupby('Continent')['GDP_Value']
+            .sum()
+            .reset_index()
+            .rename(columns={'GDP_Value': 'Total_GDP'})
+        )
+
+        # Calculate global total GDP
+        global_total = continent_gdp['Total_GDP'].sum()
+
+        # Calculate contribution percentage
+        continent_gdp['Contribution_%'] = (
+            (continent_gdp['Total_GDP'] / global_total * 100)
+            .round(2)
+        )
+
+        # Sort by contribution descending
+        result = continent_gdp.sort_values('Contribution_%', ascending=False)
 
         return result
