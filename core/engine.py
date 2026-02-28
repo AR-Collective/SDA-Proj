@@ -3,6 +3,7 @@ from .cleaner_engine import clean_dataframe
 from .melting_engine import reshape_to_long_format
 from .contracts import DataSink, PipelineService
 from typing import List, Any
+import pandas as pd
 
 class TransformationEngine(PipelineService):
     def __init__(self, sink: DataSink):
@@ -92,6 +93,14 @@ class TransformationEngine(PipelineService):
             config_array['year_end']
         )
 
+        # Countries with Consistent GDP Decline in Last x Years
+        countries_with_decline = self._calculate_countries_with_consistent_decline(
+            df_clean,
+            config_array['region'],
+            config_array['year_end'],
+            config_array.get('trend_window_years', 5)
+        )
+
         ret_data = {
             "top_10_gdp": top_10_gdp,
             "bottom_10_gdp": bottom_10_gdp,
@@ -99,6 +108,7 @@ class TransformationEngine(PipelineService):
             "avg_gdp_by_continent": avg_gdp_by_continent,
             "global_gdp_trend": global_gdp_trend,
             "fastest_growing_continent": fastest_growing_continent,
+            "countries_with_consistent_decline": countries_with_decline,
         }
         self.sink.write(ret_data)
 
@@ -216,6 +226,71 @@ class TransformationEngine(PipelineService):
             merged
             .query("Continent != 'Global'")
             .sort_values('Growth_Rate_%', ascending=False)[['Continent', 'GDP_Start', 'GDP_End', 'Growth_Rate_%']]
+        )
+
+        return result
+
+    def _calculate_countries_with_consistent_decline(self, df, region, reference_year, window_years):
+        """
+        Find countries in a region that show consistent GDP decline over a window period.
+        Consistent decline means year-over-year decline for most of the years in the window.
+
+        Args:
+            df: Clean dataframe
+            region: The region/continent to analyze
+            reference_year: The end year for the window
+            window_years: Number of years to look back
+        """
+        # Filter data for the region
+        region_data = df.pipe(filter.region, region)
+
+        # Determine year range
+        start_year = reference_year - window_years
+
+        # Filter for year range
+        window_data = region_data[
+            (region_data['Year'] >= start_year) &
+            (region_data['Year'] <= reference_year)
+        ].copy()
+
+        # Get all countries in the region
+        countries = window_data['Country Name'].unique()
+
+        decline_data = []
+
+        for country in countries:
+            country_data = (
+                window_data[window_data['Country Name'] == country]
+                .sort_values('Year')
+                [['Year', 'GDP_Value']]
+            )
+
+            if len(country_data) < 2:
+                continue
+
+            # Calculate year-over-year changes
+            country_data['YoY_Change'] = country_data['GDP_Value'].diff()
+            country_data['Is_Declining'] = country_data['YoY_Change'] < 0
+
+            # Count consecutive declining years
+            declining_years = country_data['Is_Declining'].sum()
+            total_years = len(country_data) - 1  # Exclude first year (no previous year)
+
+            # Only include if at least 50% of years show decline
+            if declining_years > 0 and (declining_years / total_years) >= 0.5:
+                decline_data.append({
+                    'Country Name': country,
+                    'Declining_Years': int(declining_years),
+                    'Total_Years': int(total_years),
+                    'Decline_Rate_%': round((declining_years / total_years) * 100, 2),
+                    'Start_GDP': country_data['GDP_Value'].iloc[0],
+                    'End_GDP': country_data['GDP_Value'].iloc[-1],
+                })
+
+        result = (
+            pd.DataFrame(decline_data)
+            .sort_values('Decline_Rate_%', ascending=False)
+            if decline_data else pd.DataFrame()
         )
 
         return result
