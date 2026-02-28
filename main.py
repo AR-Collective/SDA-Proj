@@ -3,15 +3,29 @@
 SDA Project Phase 1 - Data Loading and Processing
 """
 
-from src.data_loader import reshape_to_long_format, load_csv, extract_years_range
-from src.data_cleaner import clean_dataframe, get_cleaning_summary
-import src.config_loader as config_loader
-import src.data_filter as filter
-import sys
-import traceback
-from src.ui.summary_plugin import text_stats_element
-from src.ui.dashboard import DashboardApp
+
 import src.graphs as graphs
+from src.ui.dashboard import DashboardApp
+from src.ui.summary_plugin import text_stats_element
+import traceback
+import sys
+import src.data_filter as filter
+import src.config_loader as config_loader
+from src.data_cleaner import clean_dataframe, get_cleaning_summary
+from src.data_loader import reshape_to_long_format, load_csv, extract_years_range
+
+
+
+INPUT_DRIVERS = {"json": JsonReader, "csv": CsvReader}
+OUTPUT_DRIVERS = {"console": ConsoleWriter, "file": GraphicsChartWriter}
+
+
+def bootstrap():
+    # 1. Load config.json
+    # 2. Instantiate Output (the Sink)
+    # 3. Instantiate Core (inject the Sink)
+    # 4. Instantiate Input (inject the Core)
+    # 5. Run the Input
 
 
 def print_section(title: str) -> None:
