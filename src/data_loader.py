@@ -19,6 +19,10 @@ def load_csv(filepath: str) -> pd.DataFrame:
         raise FileNotFoundError(f"CSV file not found at {filepath}")
 
 
+
+
+# TODO: YE DUPPLICATED FUNCTION HAI, ye remove hona but abhi data_info iss pr depend kr rha
+# TODO: correct location in core/melting_engine.py
 def get_year_columns(df: pd.DataFrame) -> List[str]:
     """
     saray year columns extract krke ek sorted list mein return
@@ -28,42 +32,6 @@ def get_year_columns(df: pd.DataFrame) -> List[str]:
                      and 1900 <= int(col) <= 2100, df.columns))
     return sorted(year_cols)
 
-
-def get_metadata_columns(df: pd.DataFrame) -> List[str]:
-    """
-    Non year columns (metadata) extract krke ek list mein return
-    """
-
-    year_cols = get_year_columns(df)
-    return list(filter(lambda col: col not in year_cols, df.columns))
-
-
-def reshape_to_long_format(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Table ko reshape kia hai.
-    Instead of a separate column for each year number,
-    we have a single Year column, a Country column, and a GDP column.
-    Usmein insb k combinations hein.
-    """
-
-    year_cols = get_year_columns(df)
-    metadata_cols = get_metadata_columns(df)
-
-    melted = pd.melt(
-        df,
-        id_vars=metadata_cols,
-        value_vars=year_cols,
-        var_name='Year',
-        value_name='GDP_Value'
-    )
-
-    # Year integer mein convert
-    melted['Year'] = melted['Year'].astype(int)
-
-    # GDP float mein convert
-    melted['GDP_Value'] = melted['GDP_Value'].astype(float)
-
-    return melted
 
 
 def extract_regions_unique(df: pd.DataFrame) -> List[str]:
