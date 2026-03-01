@@ -1,70 +1,138 @@
 @startuml
-skinparam style strictuml
-skinparam handwritten false
-skinparam packageStyle rectangle
 
-title GDP Analysis Tool
+' =========================
+' Layout & Global Styling
+' =========================
+left to right direction
+skinparam backgroundColor #F9FAFB
+skinparam shadowing false
+skinparam classAttributeIconSize 0
 
-package "Main" {
-    class main <<entry point>> {
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor #1F2937
+    ArrowColor #374151
+    FontName Segoe UI
+    FontSize 12
+}
+
+skinparam package {
+    BackgroundColor #E5E7EB
+    BorderColor #374151
+}
+
+skinparam stereotypeCBackgroundColor #DBEAFE
+skinparam stereotypeCBorderColor #1D4ED8
+
+title GDP Analysis Tool - Layered Plugin Architecture
+
+' =========================
+' Application Layer
+' =========================
+package "Application Layer" {
+
+    class Main <<EntryPoint>> {
         + bootstrap()
-        + config_loader()
+        + loadConfig()
     }
 }
 
+' =========================
+' Core Layer
+' =========================
 package "Core" {
-    interface PipelineService {
-        + read(filepath: str): raw_data
+
+    interface DataSource <<PipelineService>> {
+        + read(filepath: str)
     }
-    
-    interface OutputWriter {
-        + write(data)
+
+    interface DataSink <<PipelineService>> {
+        + write(records, config)
     }
-    
-    class TransformationEngine {
-        - sink: OutputWriter
-        + __init__(sink: OutputWriter)
-        + execute(raw_data, config)
+
+    class Engine <<Core>> {
+        + execute(data, config)
+    }
+
+    class CleanerEngine <<Core>>
+    class FilterEngine <<Core>>
+    class MeltingEngine <<Core>>
+
+    Engine --> CleanerEngine
+    Engine --> FilterEngine
+    Engine --> MeltingEngine
+}
+
+' =========================
+' Input Plugins
+' =========================
+package "Plugins - Input" {
+
+    class CsvReader <<Plugin>> {
+        + read(filepath: str)
+    }
+
+    class JsonReader <<Plugin>> {
+        + read(filepath: str)
     }
 }
 
-package "Input Plugins" as InputPlugins {
-    class CsvReader {
-        + read(filepath: str): raw_data
+' =========================
+' Output Plugins
+' =========================
+package "Plugins - Output" {
+
+    class ConsoleWriter <<Plugin>> {
+        + write(records, config)
+        - _write_dict()
+        - _write_list()
     }
-    class JsonReader {
-        + read(filepath: str): raw_data
+
+    class GraphicsChartWriter <<Plugin>> {
+        - save_path
+        - app: DashboardApp
+        + write(records, config)
+        - _create_dashboard()
+    }
+
+    class DashboardApp <<VisualizationEngine>> {
+        - pages
+        - current_page_idx
+        - fig
+        + add_new_page(title)
+        + add_element(page, func)
+        + run()
     }
 }
 
-package "Output Plguins" {
-    class ConsoleWriter {
-        + write(data)
-    }
-    class GraphicsChartWriter {
-        + write(data)
-    }
-}
+' =========================
+' Relationships
+' =========================
 
-PipelineService <.. CsvReader : calls
-PipelineService <.. JsonReader : calls
-OutputWriter <|.. ConsoleWriter : implements
-OutputWriter <|.. GraphicsChartWriter : implements
+DataSource <|.. CsvReader
+DataSource <|.. JsonReader
 
-TransformationEngine o-- OutputWriter : "injected via constructor"
-TransformationEngine ..|> PipelineService
+DataSink <|.. ConsoleWriter
+DataSink <|.. GraphicsChartWriter
 
-' Orchestration Dependencies
-main ..> TransformationEngine : instantiates
-main ..> InputPlugins : instantiates via config
-main ..> OutputWriter : instantiates via config
+Engine o-- DataSink : injected
+Engine ..> DataSource : uses
 
-note right of main
-  Reads config.json
-  Instantiates OutputWriter
-  Injects it into TransformationEngine
-  Calls PipelineService.read()
-  Passes data to Engine.execute()
-end note
+Main ..> Engine : instantiates
+Main ..> DataSource : loads via config
+Main ..> DataSink : loads via config
+
+GraphicsChartWriter *-- DashboardApp
+
+' =========================
+' Legend
+' =========================
+legend right
+  <<EntryPoint>> Application bootstrap
+  <<Core>> Business logic layer
+  <<PipelineService>> Core pipeline interface
+  <<Plugin>> Extensible implementation
+  <<VisualizationEngine>> UI rendering engine
+end legend
 
 @enduml
