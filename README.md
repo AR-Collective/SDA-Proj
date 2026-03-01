@@ -552,7 +552,37 @@ This structure perfectly implements the **Dependency Inversion Principle** with 
 | **Protocol Compliance** | `plugins/` modules | Each plugin implements same interface independently |
 | **Configuration-Driven Behavior** | `core/engine.py` | Config flows through entire pipeline for dynamic titles |
 | **Data Wrapping** | `core/engine.py` | `build_result()` couples title with data; plugin extracts both |
+| **Input Validation** | `core/validator.py` | Two-level validation prevents silent failures |
 | **Extensibility** | Throughout | Add formats, analyses, visualizations without modifying core |
+
+## ✅ Smart Configuration Validation
+
+The system includes **two-level validation** to catch configuration errors early and provide helpful guidance:
+
+**Level 1: Format Checks** (instant, before data load)
+- Input format matches file extension (csv ↔ .csv, json ↔ .json)
+- File actually exists and is readable
+- Operation is supported (growth_rate)
+- Limit is positive integer
+- Scope is valid (continent, country, year, global)
+
+**Level 2: Data Validation** (after data load)
+- Region exists in loaded data → shows valid regions
+- Year exists in loaded data → shows valid year range
+- Year range is within bounds → shows actual bounds
+- Trend window doesn't exceed available years → shows max allowed
+
+**Example Error Messages:**
+```
+❌ Region 'InvalidRegion' not found in data.
+   Valid regions: Africa, Asia, Europe, Global, North America, Oceania, South America
+
+❌ Input format 'csv' does not match file extension.
+   File: data/gdp_with_continent_filled.json
+   Expected: *.csv file
+```
+
+No more cryptic errors or silent failures! ✨
 
 ## 💡 Why DIP Over Functional Programming?
 

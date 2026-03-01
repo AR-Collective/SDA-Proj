@@ -1,13 +1,13 @@
 {
   "input_format": "json",
   "filepath": "data/gdp_with_continent_filled.json",
-  "output_format": "graphics",
+  "output_format": "console",
   "scope": "continent",
   "region": "Africa",
   "year": 2023,
   "year_start": 2018,
   "year_end": 2023,
   "limit": 10,
-  "trend_window_years": 7,
+  "trend_window_years": 5,
   "operation": "growth_rate"
 }

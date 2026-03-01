@@ -302,6 +302,52 @@ SDA-Proj/
 
 Simply edit `config.json` and re-run `python main.py`. All titles and parameters in the dashboard will automatically reflect the new config values (e.g., year ranges, region names).
 
+### ✅ Configuration Validation
+
+The application includes a **comprehensive two-level validation system** to prevent silent failures and catch configuration errors early:
+
+#### **Level 1: Early Validation** (Before Loading Data)
+Checked immediately after loading `config.json` to fail-fast on format errors:
+
+| Validation | Error Message | Example Fix |
+|-----------|---------------|------------|
+| **Input Format ↔ File Extension Match** | `❌ Input format 'csv' does not match file extension. File: data/gdp_with_continent_filled.json Expected: *.csv file` | Change `input_format` to `"json"` |
+| **File Exists** | `❌ File not found: data/invalid_file.csv` | Verify filepath is correct and file exists |
+| **Operation Valid** | `❌ Operation 'invalid_op' is not allowed. Valid operations: growth_rate` | Use only `"growth_rate"` |
+| **Limit is Positive Integer** | `❌ Limit must be a positive integer, got: -5` | Change to positive number (e.g., `10`) |
+| **Scope Valid** | `❌ Scope 'invalid' is invalid. Valid scopes: continent, country, year, global` | Use one of: `continent`, `country`, `year`, `global` |
+
+#### **Level 2: Data-Dependent Validation** (After Loading Data)
+Checked after loading the dataset to validate against actual data:
+
+| Validation | Error Message | Example Fix |
+|-----------|---------------|------------|
+| **Region Exists in Data** | `❌ Region 'ASjad Raza' not found in data. Valid regions: Africa, Asia, Europe, Global, North America, Oceania, South America` | Use valid region from list |
+| **Year Exists in Data** | `❌ Year 20202323 not found in data. Valid years: 1960 to 2024` | Use year between 1960-2024 |
+| **Year Range Valid** | `❌ Year range invalid: 20123238 to 20231323 Valid range: 1960 to 2024` | Use valid year range (e.g., `2018` to `2023`) |
+| **Trend Window Within Range** | `❌ Trend window years (100) exceeds available year range (64). Trend window years must be between 1 and 64` | Reduce `trend_window_years` to ≤ 64 |
+
+#### **Success Message**
+
+When all validations pass, you'll see:
+
+```
+✓ Configuration validated successfully
+  Region: Africa
+  Year: 2023
+  Year Range: 2018 to 2023
+  Operation: growth_rate
+  Limit: 10
+  Scope: continent
+  Trend Window: 5 years
+```
+
+#### **Why Two Levels?**
+
+- **Level 1** fails-fast on fixable errors (bad filename, typo in operation) without expensive data loading
+- **Level 2** validates against actual data (is this region in the dataset?) after the data is available
+- **Together** they prevent confusing errors and provide clear guidance on what's wrong
+
 ---
 
 ## Extending the System
