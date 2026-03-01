@@ -1,0 +1,69 @@
+@startuml
+skinparam style strictuml
+skinparam handwritten false
+skinparam packageStyle rectangle
+
+title GDP Analysis Tool
+
+package "Main" {
+    class main <<entry point>> {
+        + bootstrap()
+        + config_loader()
+    }
+}
+
+package "Core" {
+    interface InputReader {
+        + read(filepath: str): raw_data
+    }
+    
+    interface OutputWriter {
+        + write(data)
+    }
+    
+    class TransformationEngine {
+        - sink: OutputWriter
+        + __init__(sink: OutputWriter)
+        + execute(raw_data, config)
+    }
+}
+
+package "Input Plugins" {
+    class CsvReader {
+        + read(filepath: str): raw_data
+    }
+    class JsonReader {
+        + read(filepath: str): raw_data
+    }
+}
+
+package "Output Plguins" {
+    class ConsoleWriter {
+        + write(data)
+    }
+    class GraphicsChartWriter {
+        + write(data)
+    }
+}
+
+InputReader <|.. CsvReader : implements
+InputReader <|.. JsonReader : implements
+OutputWriter <|.. ConsoleWriter : implements
+OutputWriter <|.. GraphicsChartWriter : implements
+
+TransformationEngine o-- OutputWriter : "injected via constructor"
+
+' Orchestration Dependencies
+main ..> TransformationEngine : instantiates
+main ..> InputReader : instantiates via config
+main ..> OutputWriter : instantiates via config
+
+note right of main
+  Reads config.json
+  Instantiates OutputWriter
+  Injects it into TransformationEngine
+  Calls InputReader.read()
+  Passes data to Engine.execute()
+end note
+
+@enduml
