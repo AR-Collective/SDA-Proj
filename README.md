@@ -1,44 +1,109 @@
-# SDA-Proj — Phase 1: GDP Data Loading, Processing & Analysis Dashboard
+# SDA-Proj — Phase 2: Modular GDP Analysis with Dependency Injection
 
-A functional programming-based GDP analysis platform that loads, cleans, and visualizes world GDP data across regions and countries. Built with strict separation of concerns and configuration-driven behavior.
+A production-grade modular architecture for GDP data analysis following **Dependency Inversion Principle (DIP)**. Features pluggable input/output drivers, 8 comprehensive analysis calculations, and an interactive 8-page dashboard with real-time configuration-driven visualization.
 
 ## 🎯 Overview
 
-This project implements Phase 1 of the Statistical Data Analysis (SDA) project: a complete data pipeline for processing and analyzing GDP datasets in long format. The system is designed with:
+Phase 2 transforms Phase 1's functional approach into a **scalable, enterprise-grade modular system**:
 
-- **Functional Programming Paradigms** – `map()`, `filter()`, `lambda`, and functional composition
-- **Single Responsibility Principle (SRP)** – Each module has one clear purpose
-- **Configuration-Driven Architecture** – All behavior controlled via `config.json`, no hardcoding
-- **Interactive Dashboard** – Real-time visualization with statistics and multi-page navigation
+- **Dependency Inversion Principle (DIP)** – Core defines Protocols; plugins implement them
+- **Plugin Architecture** – Add new input/output formats without changing core logic
+- **Dependency Injection** – Components receive dependencies at runtime
+- **8 GDP Analysis Calculations** – Comprehensive statistical computations
+- **Interactive 8-Page Dashboard** – One window, 8 navigable pages, keyboard controls
+- **Configuration-Driven Titles** – Page headings dynamically reflect `config.json` values
+- **Clean Code Patterns** – Factory, Strategy, and Observer patterns throughout
 
 ## 📊 Architecture
 
-The project is organized into clean, single-purpose modules:
+### Core Module (Contracts)
+
+Defines abstract interfaces using Python `Protocol`:
 
 ```
-src/
-├── data_loader.py          # Load CSV & reshape to long format
-├── data_cleaner.py         # Handle missing values (5 strategies)
-├── data_filter.py          # Filter by region/country/year & aggregate
-├── config_loader.py        # Load & validate JSON configuration
-├── graphs.py               # Plotting functions (bar, donut, line, scatter)
-└── ui/
-    ├── dashboard.py        # Interactive multi-page dashboard
-    └── summary_plugin.py   # Summary statistics panel
+core/
+├── contracts.py       # DataSink & PipelineService protocols
+├── engine.py          # TransformationEngine implements PipelineService
+└── __init__.py
 ```
 
-### Data Flow
+### Plugin Modules
+
+Implement protocols without coupling to core:
+
+```
+plugins/
+├── inputs/
+│   ├── csv_driver.py   # CSV input implementation
+│   └── json_driver.py  # JSON input implementation
+└── outputs/
+    ├── console.py      # Console writer (DataSink)
+    └── graphics.py     # Interactive dashboard (DataSink)
+```
+
+### Data Flow (DIP Pattern)
 
 ```
 config.json
     ↓
-main.py → config_loader → validate config against data
+bootstrap() → instantiate Sink (plugin)
     ↓
-load_csv() → reshape_to_long_format() → data_cleaner → clean_dataframe()
+TransformationEngine(sink) ← dependency injected
     ↓
-data_filter → region/year/country filtering & aggregation
+load_input() ← dynamic driver selection
     ↓
-dashboard → visualizations & summary statistics
+engine.execute(raw_data, config)
+    ↓
+sink.write(results, config) ← dynamic titles from config
+    ↓
+Dashboard / Console output
+```
+
+### System Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      main.py (Bootstrap)                    │
+│  Orchestrates Component Initialization (DIP Pattern)        │
+└────────────┬────────────────────────────────────────────────┘
+             │
+    ┌────────┴─────────┐
+    ↓                  ↓
+┌─────────────┐  ┌──────────────────┐
+│  config.json│  │ INPUT_DRIVERS {} │
+└─────────────┘  │ (factory pattern) │
+                 └──────────────────┘
+                  ↓         ↓
+            CSV Reader   JSON Reader
+                  │         │
+    ┌─────────────┴─────────┘
+    ↓
+raw_data ────────────┐
+                     ↓
+            ┌─────────────────────────────┐
+            │ TransformationEngine        │
+  (sink) ───│ Implements PipelineService  │
+  injected  │ • 8 Analysis Methods        │
+            │ • build_result() wrapper    │
+            │ • execute(raw_data, config) │
+            └─────────────────────────────┘
+                     ↓
+            results (dict with titles)
+                     ↓
+    ┌────────────────┴────────────────┐
+    ↓                                 ↓
+OUTPUT_DRIVERS {} ────────────────────────
+(factory pattern)
+    ↓               ↓
+ConsoleWriter   GraphicsChartWriter
+                (DataSink)
+                     ↓
+            ┌────────────────────┐
+            │ 8-Page Dashboard   │
+            │ • Keyboard control │
+            │ • Dynamic titles   │
+            │ • Clean graphs     │
+            └────────────────────┘
 ```
 
 ## 🚀 Quick Start
@@ -46,8 +111,8 @@ dashboard → visualizations & summary statistics
 ### 1. Setup Environment
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -57,17 +122,29 @@ Edit `config.json`:
 
 ```json
 {
-  "region": "Asia",
-  "year": 2024,
-  "operation": "sum",
-  "output": "dashboard"
+  "input_format": "json",
+  "filepath": "data/gdp_with_continent_filled.json",
+  "output_format": "graphics",
+  "region": "Africa",
+  "year": 2023,
+  "year_start": 2018,
+  "year_end": 2023,
+  "trend_window_years": 7
 }
 ```
 
-- **region**: Choose from available continents (Asia, Europe, Africa, etc.)
-- **year**: Any year in range 1960-2024
-- **operation**: `"sum"` (total GDP) or `"average"` (avg GDP)
-- **output**: Currently `"dashboard"` (extensible for future outputs)
+**Configuration Options:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `input_format` | string | `"csv"` or `"json"` – selects input driver |
+| `filepath` | string | Path to data file (CSV or JSON) |
+| `output_format` | string | `"console"` or `"graphics"` – selects output sink |
+| `region` | string | Continental region (Africa, Asia, Europe, etc.) |
+| `year` | integer | Single year for top 10 GDP analysis |
+| `year_start` | integer | Start year for growth rate calculation |
+| `year_end` | integer | End year for growth rate calculation |
+| `trend_window_years` | integer | Years to include in global trend analysis |
 
 ### 3. Run the Analysis
 
@@ -76,160 +153,161 @@ python3 main.py
 ```
 
 **Output:**
-- Console: Cleaning summary with statistics
-- Dashboard: Interactive multi-page visualization
-  - **Page 1** (Initial): Summary statistics & configuration
-  - **Page 2** (Press RIGHT ARROW): GDP trends, distribution, and regional comparison
-  - Navigate with arrow keys
+- **Console Mode**: Displays analysis results in console with formatted tables
+- **Graphics Mode**: Opens interactive 8-page dashboard
+  - Press **LEFT ARROW** or **RIGHT ARROW** to navigate pages
+  - Each page has a unique visualization and analysis
+  - Page titles dynamically reflect your configuration
 
-## 📚 What's Implemented
+## 📚 8 Analysis Calculations
 
-### ✅ Data Loading (`src/data_loader.py`)
+The dashboard displays 8 comprehensive GDP analyses across 8 navigable pages:
 
-Converts wide-format CSV (years as columns) to long format (Year as column):
+| Page | Calculation | Type | Details |
+|------|-------------|------|---------|
+| **1** | Top 10 GDP Countries | Bar Chart | Highest GDP countries in selected region/year |
+| **2** | GDP Growth Rate | Line Chart | Year-over-year growth in selected region |
+| **3** | Global GDP Trend | Bar Chart | Total world GDP across years (window-based) |
+| **4** | Average GDP by Continent | Donut Chart | Average GDP per country across all continents |
+| **5** | GDP Distribution | Histogram | Distribution pattern of all global GDP values |
+| **6** | Region Comparison | Grouped Bar | GDP comparison across all continents |
+| **7** | Continent Contribution | Pie Chart | Percentage contribution to global GDP |
+| **8** | Year-over-Year Comparison | Line Chart | GDP changes across selected year range |
 
-```
-Before:
-Country    | 1960 | 1961 | 1962 | ... | 2024
-Afghanistan| 1200 | 1300 | 1400 | ... | 5000
+Each calculation is:**
+- **Dynamically configured** – Parameters pulled from `config.json`
+- **Visually distinct** – Different chart types for different insights
+- **Title-driven** – Page headings reflect configuration values
+- **Data quality assured** – Empty datasets filtered automatically
 
-After:
-Country    | Year | GDP_Value
-Afghanistan| 1960 | 1200
-Afghanistan| 1961 | 1300
-Afghanistan| 2024 | 5000
-```
+## 🏛️ Design Patterns & Principles
 
-**Functions:**
-- `load_csv()` – Read GDP CSV file
-- `reshape_to_long_format()` – Convert wide → long format
-- `extract_regions_unique()` – Get all continents/regions
-- `extract_countries_unique()` – Get all countries
-- `extract_years_range()` – Get min/max year
+### Dependency Inversion Principle (DIP)
 
-### ✅ Data Cleaning (`src/data_cleaner.py`)
+The core architecture inverts dependencies to enable modularity:
 
-Handles missing values with 5 strategies using **functional programming**:
+**Core ↔ Contracts (Protocols)**:
 
 ```python
-FILLING_STRATEGIES = {
-    'mean': Calculate average of column,
-    'median': Use middle value,
-    'mode': Use most frequent value,
-    'forward_fill': Use previous value,
-    'backward_fill': Use next value
+# core/contracts.py
+from typing import Protocol, List
+
+class DataSink(Protocol):
+    """Abstraction that output drivers implement"""
+    def write(self, records: List[dict], config: dict = None) -> None: ...
+
+class PipelineService(Protocol):
+    """Abstraction for transformation engines"""
+    def execute(self, raw_data: List[Any], config_array: dict) -> None: ...
+```
+
+**Plugin Independence:**
+
+Plugins depend ON Protocols, NOT on each other or core:
+
+```python
+# plugins/outputs.py (ConsoleWriter and GraphicsChartWriter)
+class ConsoleWriter:
+    def write(self, records: Any, config: dict = None) -> None:
+        # Implements DataSink protocol
+        print("Analysis Results:")
+        print(records)
+
+class GraphicsChartWriter:
+    def write(self, records: Any, config: dict = None) -> None:
+        # Implements DataSink protocol
+        # Create 8-page dashboard from records
+        self._create_dashboard(records, config)
+```
+
+**Bootstrap Pattern (Dependency Injection):**
+
+```python
+# main.py
+def bootstrap():
+    config = config_loader()
+
+    # Factory pattern: select driver based on config
+    sink = OUTPUT_DRIVERS[config['output_format']]()
+
+    # Dependency injection: engine receives sink at runtime
+    engine = TransformationEngine(sink)
+
+    raw_data = INPUT_DRIVERS[config['input_format']](config['filepath'])
+
+    # Engine calls sink without knowing its concrete type
+    engine.execute(raw_data, config)
+```
+
+**Benefits:**
+- ✅ Add new input/output formats without modifying core
+- ✅ Swap implementations (console ↔ graphics) instantly
+- ✅ Easy testing with mock sinks
+- ✅ Clear separation of concerns
+
+### Factory Pattern
+
+Dynamic driver selection from configuration:
+
+```python
+INPUT_DRIVERS = {
+    'csv': load_csv_driver,
+    'json': load_json_driver,
 }
+
+OUTPUT_DRIVERS = {
+    'console': ConsoleWriter,
+    'graphics': GraphicsChartWriter,
+}
+
+# Usage
+sink = OUTPUT_DRIVERS[config['output_format']]()
 ```
 
-**Key Implementation:** Uses `map()` + `lambda` to apply cleaning to all numeric columns:
+### Configuration-Driven Titles
+
+Page headings reflect configuration dynamically:
 
 ```python
-processed_cols = dict(map(
-    lambda col: (col, handle_missing_values_in_column(df[col], strategy)),
-    numeric_cols
-))
+# core/engine.py
+def build_result(title: str, data):
+    """Wrap data with dynamic title"""
+    return {"title": title, "data": data}
+
+def execute(self, raw_data, config_array):
+    result = {
+        "top_10_gdp": build_result(
+            f"Top 10 GDP Countries in {config_array['region']} ({config_array['year']})",
+            self._compute_top_10(raw_data, config_array)
+        ),
+        # ... 7 more analyses
+    }
+    self.sink.write(result, config_array)
 ```
 
-### ✅ Data Filtering & Aggregation (`src/data_filter.py`)
+When `config.json` changes:
+```json
+{ "region": "Asia", "year": 2023 }  →  Dashboard title: "Top 10 GDP Countries in Asia (2023)"
+{ "region": "Africa", "year": 2024 }  →  Dashboard title: "Top 10 GDP Countries in Africa (2024)"
+```
 
-Pure functions for filtering and aggregating:
+### DataSink Abstraction
 
-- `region(df, "Asia")` – Keep only Asia rows
-- `country(df, "India")` – Keep only India rows
-- `year(df, 2024)` – Keep only 2024 rows
-- `accumulate(df, config, "Continent")` – Sum/average by continent
+Plugins implement a simple write interface:
 
-**Functional Pipeline:**
 ```python
-df_by_region = (
-    df_clean
-    .pipe(filter.year, 2024)                    # Filter year
-    .pipe(filter.accumulate, config, 'Continent')  # Aggregate by continent
-    .query("Continent != 'Global'")             # Remove global aggregate
-)
-```
-
-### ✅ Configuration Management (`src/config_loader.py`)
-
-- Load `config.json`
-- Validate required keys exist
-- Check data types (string, int, valid enum)
-- Verify region & year exist in dataset
-- **Helpful error messages** with available options
-
-### ✅ Interactive Dashboard
-
-**Page 1 - Summary Statistics:**
-- **Config Result Box**: Displays computed value (e.g., "Sum GDP (Asia, 2024): $113.7T")
-- **Year Range Stats**: Total, average, max, min values for selected year range
-- **Average GDP by Continent**: All-time continental statistics with min/max
-- **Top 5 Countries**: Highest average GDP across all time
-- **System Configuration**: Current config values displayed
-
-**Page 2 - Visualizations:**
-- **Line Plot**: GDP growth trend over years (for selected region)
-- **Scatter Plot**: GDP distribution with regression line
-- **Bar Chart**: 2024 GDP contribution by continent
-- **Donut Chart**: 2024 GDP distribution percentages
-
-## 🎯 Functional Programming Implementation
-
-### Lambda Functions
-
-One-line functions used with `map()` and `filter()`:
-
-**Extract year columns:**
-```python
-filter(lambda col: str(col).isdigit() and 1900 <= int(col) <= 2100, df.columns)
-# Keep only columns that are numeric and represent years
-```
-
-**Calculate missing value percentages:**
-```python
-map(lambda col: (col, (df[col].isna().sum() / len(df)) * 100), df.columns)
-# For each column, calculate percentage of missing values
-```
-
-**Identify numeric columns:**
-```python
-filter(lambda col: pd.api.types.is_numeric_dtype(df[col]), df.columns)
-# Keep only numeric columns for cleaning
-```
-
-### Functional Patterns
-
-- **No explicit loops** – `map()` and `filter()` replace for-loops
-- **Function composition** – Pandas `.pipe()` chains operations
-- **Dictionary comprehensions** – Concise data structure creation
-- **Immutability** – Data flows through functions unchanged
-
-## 🏗️ Design Principles
-
-### Single Responsibility Principle (SRP)
-
-Each module has **one clear purpose**:
-
-| Module | Responsibility | Does NOT do |
-|--------|-----------------|------------|
-| `data_loader.py` | Load & reshape data | Process, clean, or filter |
-| `data_cleaner.py` | Handle missing values | Load, filter, or visualize |
-| `data_filter.py` | Filter & aggregate | Load, clean, or visualize |
-| `config_loader.py` | Manage configuration | Process or analyze data |
-| `graphs.py` + `ui/` | Visualize data | Load, clean, or process |
-
-**Benefit:** Easy to test, modify, and maintain each module independently.
-
-### Error Handling
-
-The system provides **helpful feedback**:
-
-```
-✗ Configuration error: The region 'Invalid' does not exist in the data.
-
-Available regions (sample): ['Africa', 'Asia', 'Europe', 'Global', 
-                             'North America', 'Oceania', 'South America']
-
-Available years: 1960 - 2024
+class DataSink(Protocol):
+    def write(self, records: List[dict], config: dict = None) -> None:
+        """
+        records: Results dict with structure:
+        {
+            "top_10_gdp": {"title": "...", "data": DataFrame},
+            "growth_rate": {"title": "...", "data": DataFrame},
+            ... 8 analyses total
+        }
+        config: Config dict for runtime behavior
+        """
+        ...
 ```
 
 ## 📦 Dependencies
@@ -243,67 +321,242 @@ Available years: 1960 - 2024
 
 See `requirements.txt` for versions.
 
-## 🧪 Testing the System
+## 🧪 Testing Scenarios
 
-### Test Case 1: Asia 2024 Total GDP
+### Scenario 1: Console Output (Africa GDP Analysis)
+
 ```json
 {
+  "input_format": "csv",
+  "filepath": "data/gdp_with_continent_filled.csv",
+  "output_format": "console",
+  "region": "Africa",
+  "year": 2023,
+  "year_start": 2020,
+  "year_end": 2023,
+  "trend_window_years": 5
+}
+```
+
+**Expected Output:**
+```
+SDA PROJECT PHASE 2 - Modular Orchestration
+=============================================
+Analysis Results:
+Top 10 GDP Countries in Africa (2023):
+    Country           GDP
+1.  Nigeria        $477B
+2.  Egypt          $372B
+3.  South Africa   $342B
+...
+```
+
+### Scenario 2: Interactive Graphics Dashboard (Asia)
+
+```json
+{
+  "input_format": "json",
+  "filepath": "data/gdp_with_continent_filled.json",
+  "output_format": "graphics",
   "region": "Asia",
-  "year": 2024,
-  "operation": "sum",
-  "output": "dashboard"
+  "year": 2023,
+  "year_start": 2018,
+  "year_end": 2023,
+  "trend_window_years": 7
 }
 ```
-Expected: Shows total GDP of all countries in Asia for 2024
 
-### Test Case 2: Europe Average GDP
+**Expected Output:**
+- 8-page interactive dashboard opens
+- Page titles show: "Top 10 GDP Countries in Asia (2023)", "GDP Growth Rate in Asia from 2018 to 2023", etc.
+- Press LEFT/RIGHT arrows to navigate
+- No overlapping text, clean visualizations
+
+### Scenario 3: Configuration Change (Dynamic Titles)
+
+**First run:**
 ```json
-{
-  "region": "Europe",
-  "year": 2020,
-  "operation": "average",
-  "output": "dashboard"
-}
+{ "region": "Europe", "year": 2022 }
 ```
-Expected: Shows average GDP per country in Europe for 2020
+→ Dashboard shows: "Top 10 GDP Countries in Europe (2022)"
 
-### Test Case 3: Invalid Region (Error Handling)
+**Second run (config changed):**
 ```json
-{
-  "region": "Atlantis",
-  "year": 2024,
-  "operation": "sum",
-  "output": "dashboard"
-}
+{ "region": "South America", "year": 2024 }
 ```
-Expected: Error message with available regions
+→ Dashboard shows: "Top 10 GDP Countries in South America (2024)"
 
-## 💡 Why Functional Programming?
+(Titles update automatically without code changes)
 
-1. **Easier to Test** – Pure functions return same output for same input
-2. **No Hidden State** – No global variables or side effects
-3. **Composable** – Functions chain together naturally
-4. **Readable** – `map(lambda x: ..., items)` is clearer than loops
-5. **Reusable** – Each function works independently
+## 🔧 Extending the System
 
-**Example:**
+### Adding a New Input Format
+
+1. **Create input driver** (`plugins/inputs/new_format.py`):
+
 ```python
-# Functional approach (easy to read and compose)
-numeric_cols = list(filter(lambda col: is_numeric(col), df.columns))
-missing_pcts = dict(map(lambda col: (col, pct_missing(col)), numeric_cols))
+def load_new_format(filepath: str) -> List[Any]:
+    """Load data from new format"""
+    # Your implementation here
+    return raw_data
 
-# vs Traditional loops
-numeric_cols = []
-missing_pcts = {}
-for col in df.columns:
-    if is_numeric(col):
-        numeric_cols.append(col)
-        missing_pcts[col] = pct_missing(col)
+# Register in main.py
+INPUT_DRIVERS['new_format'] = load_new_format
 ```
 
-## 📖 Detailed Documentation
+2. **Update config.json** `input_format` to `"new_format"`
+3. No changes needed in core or other plugins ✅
 
-For detailed API reference, function signatures, and advanced usage patterns, see [DOCUMENTATION.md](./DOCUMENTATION.md).
+### Adding a New Output Format
+
+1. **Create output writer** (`plugins/outputs/new_writer.py`):
+
+```python
+class NewWriter:
+    def write(self, records: Any, config: dict = None) -> None:
+        """Implement DataSink protocol"""
+        # Process records dict and config
+        # Display results however you want
+
+# Register in main.py
+OUTPUT_DRIVERS['new_format'] = NewWriter
+```
+
+2. **Update config.json** `output_format` to `"new_format"`
+3. No changes needed in core or other plugins ✅
+
+### Adding a New Analysis Calculation
+
+1. **Add method to TransformationEngine** (`core/engine.py`):
+
+```python
+def _compute_new_analysis(self, data: List[Any], config: dict):
+    """New statistical computation"""
+    # Your analysis logic here
+    return result_dataframe
+
+# Add to execute() method's results dict
+results['new_analysis'] = build_result(
+    f"Dynamic Title from {config['region']}",
+    self._compute_new_analysis(data, config)
+)
+```
+
+2. **Add 9th page to dashboard** (`plugins/outputs/graphics.py`):
+
+```python
+# In _create_dashboard()
+if 'new_analysis' in data_dict:
+    p9 = self.app.add_new_page(data_dict['new_analysis'].get("title"))
+    self.app.add_element(p9, self._graph_new_analysis, data_dict['new_analysis'].get("data"))
+
+# Add visualization method
+def _graph_new_analysis(self, ax, df):
+    # Your matplotlib code here
+    pass
+```
+
+3. No changes needed elsewhere ✅
+
+## 📚 Project Structure
+
+```
+SDA-Proj/
+├── main.py                          # Bootstrap orchestrator
+├── config.json                      # Configuration file
+├── requirements.txt                 # Python dependencies
+├── README.md                        # This file
+├── DOCUMENTATION.md                 # Points to Sphinx docs
+├── index.html → docs/build/html    # Symlink to Sphinx docs
+│
+├── core/                            # Core module (defines contracts)
+│   ├── __init__.py
+│   ├── contracts.py                 # DataSink & PipelineService protocols
+│   └── engine.py                    # TransformationEngine (8 analyses)
+│
+├── plugins/                         # Plugin modules (implement protocols)
+│   ├── __init__.py
+│   ├── inputs/
+│   │   ├── __init__.py
+│   │   ├── csv_driver.py           # CSV input implementation
+│   │   └── json_driver.py          # JSON input implementation
+│   │
+│   └── outputs/
+│       ├── __init__.py
+│       ├── console.py              # Console output (DataSink)
+│       └── graphics.py             # Dashboard output (DataSink)
+│
+├── data/                            # Dataset directory
+│   ├── gdp_with_continent_filled.csv
+│   └── gdp_with_continent_filled.json
+│
+└── docs/                            # Sphinx documentation
+    ├── Makefile
+    ├── build/html/                 # Generated HTML (linked from index.html)
+    ├── source/
+    │   ├── conf.py
+    │   └── *.rst
+    └── ...
+```
+
+## 🎓 Key Learning Points (Phase 2)
+
+| Concept | Location | Why It Matters |
+|---------|----------|----------------|
+| **DIP** | `core/contracts.py` | Enables plugin architecture; core isolated from plugins |
+| **Protocols** | `core/contracts.py` | Python's way to define structural interfaces |
+| **Dependency Injection** | `main.py` bootstrap | Components receive dependencies; decoupled code |
+| **Factory Pattern** | `main.py` | Dynamic driver selection from configuration |
+| **Protocol Compliance** | `plugins/` modules | Each plugin implements same interface independently |
+| **Configuration-Driven Behavior** | `core/engine.py` | Config flows through entire pipeline for dynamic titles |
+| **Data Wrapping** | `core/engine.py` | `build_result()` couples title with data; plugin extracts both |
+| **Extensibility** | Throughout | Add formats, analyses, visualizations without modifying core |
+
+## 💡 Why DIP Over Functional Programming?
+
+**Phase 1 (Functional):** Perfect for pure data transformation without side effects
+
+**Phase 2 (DIP):** Better for:
+- ✅ Long-lived systems with multiple I/O sources
+- ✅ Team-based development (clear contracts)
+- ✅ Plugin ecosystems (extend without modifying)
+- ✅ Testing with mock objects
+- ✅ Swappable implementations (console ↔ graphics instantly)
+- ✅ Real-world production systems
+
+**Comparison:**
+```
+Phase 1: Data flows linearly → clean, pure, minimal
+Phase 2: Many input/output paths → needs invertible dependencies
+```
+
+## 📖 Documentation
+
+For detailed implementation guide, API reference, and troubleshooting:
+
+👉 **See [DOCUMENTATION.md](./DOCUMENTATION.md)** – Points to Sphinx documentation
+
+Run Sphinx locally:
+```bash
+cd docs/
+make html
+# Open docs/build/html/index.html in browser
+```
+
+Or access via symlink:
+```bash
+open index.html
+# Direct access to Sphinx docs
+```
+
+## 🔍 Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Dashboard won't open | Check matplotlib installed; verify display available |
+| Config changes not reflected | Kill app, restart with new config.json |
+| Empty analysis results | Verify region/year range exists in dataset |
+| Import errors | Ensure `source venv/bin/activate` before running |
 
 ## 📄 License
 
@@ -314,8 +567,12 @@ Academic project for SDA course evaluation.
 - **Syed Asjad Raza**
 - **Ahmad Rehan**
 
-Built as part of Phase 1 of the SDA Project (2026)
+Built as part of **Phase 2 of the SDA Project** (2026)
+
+### Phase Evolution
+- **Phase 1**: Functional programming paradigm with single-purpose modules
+- **Phase 2**: Modular architecture with Dependency Inversion Principle
 
 ---
 
-**Last Updated:** February 2026
+**Last Updated:** March 2026
