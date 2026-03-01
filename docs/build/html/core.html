@@ -71,6 +71,7 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#module-core.engine">core.engine module</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#core.engine.TransformationEngine"><code class="docutils literal notranslate"><span class="pre">TransformationEngine</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#core.engine.build_result"><code class="docutils literal notranslate"><span class="pre">build_result()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#module-core.filter_engine">core.filter_engine module</a><ul>
@@ -139,8 +140,36 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="core.cleaner_engine.clean_dataframe">
 <span class="sig-prename descclassname"><span class="pre">core.cleaner_engine.</span></span><span class="sig-name descname"><span class="pre">clean_dataframe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">handle_missing</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">missing_strategy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'mean'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_duplicates</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">duplicate_subset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#core.cleaner_engine.clean_dataframe" title="Link to this definition"></a></dt>
-<dd><p>-&gt; upar walay sb functions iske liye bnaye thy. functional approac ;)
-Cleaned DataFrame return</p>
+<dd><p>Executes the main data cleaning pipeline using a functional approach.</p>
+<p>This function acts as the primary orchestrator for the cleaning module,
+applying a series of specialized, smaller cleaning functions (like removing
+duplicates and handling missing values) to produce a finalized dataset.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>pd.DataFrame</em>) – The original DataFrame to be cleaned.</p></li>
+<li><p><strong>handle_missing</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to process and impute missing values.
+Defaults to True.</p></li>
+<li><p><strong>missing_strategy</strong> (<em>str</em><em>, </em><em>optional</em>) – The strategy to use for imputing numeric
+missing values (e.g., ‘mean’, ‘median’). Defaults to ‘mean’.</p></li>
+<li><p><strong>remove_duplicates</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to drop duplicate rows.
+Defaults to True.</p></li>
+<li><p><strong>duplicate_subset</strong> (<em>List</em><em>[</em><em>str</em><em>]</em><em>, </em><em>optional</em>) – Specific column names to consider
+when identifying duplicates. If None, all columns are considered.
+Defaults to None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A new, cleaned copy of the DataFrame with the specified</dt><dd><p>operations applied.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
@@ -166,16 +195,23 @@ Dictionary has column names and percentage of missing values</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="core.cleaner_engine.get_cleaning_summary">
 <span class="sig-prename descclassname"><span class="pre">core.cleaner_engine.</span></span><span class="sig-name descname"><span class="pre">get_cleaning_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df_before</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df_after</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span></span></span><a class="headerlink" href="#core.cleaner_engine.get_cleaning_summary" title="Link to this definition"></a></dt>
-<dd><p>jo kam kia h uski summary return.</p>
+<dd><p>Generates a summary of the data cleaning operations performed.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>df_before</strong> – Original DataFrame before cleaning</p></li>
-<li><p><strong>df_after</strong> – Cleaned DataFrame</p></li>
+<li><p><strong>df_before</strong> (<em>pd.DataFrame</em>) – The original DataFrame before cleaning.</p></li>
+<li><p><strong>df_after</strong> (<em>pd.DataFrame</em>) – The resulting DataFrame after the cleaning process.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Dictionary containing cleaning summary</p>
+<dd class="field-even"><p><dl class="simple">
+<dt>A dictionary containing the summary statistics and changes made</dt><dd><p>during the cleaning process (e.g., rows removed, missing values handled).</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dict</p>
 </dd>
 </dl>
 </dd></dl>
@@ -280,6 +316,11 @@ Any Output module must implement this method signature.</p>
 <dd></dd></dl>
 
 </dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="core.engine.build_result">
+<span class="sig-prename descclassname"><span class="pre">core.engine.</span></span><span class="sig-name descname"><span class="pre">build_result</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#core.engine.build_result" title="Link to this definition"></a></dt>
+<dd></dd></dl>
 
 </section>
 <section id="module-core.filter_engine">
