@@ -70,7 +70,7 @@ class GraphicsChartWriter:
         self.save_path = save_path
         self.app = None
 
-    def write(self, records: Any, config: dict = None) -> None:
+    def write(self, records: Any) -> None:
         """
         Write records as visual dashboard with 8 pages.
         Each page contains one graph for each output calculation.
@@ -80,12 +80,12 @@ class GraphicsChartWriter:
             config: Configuration dictionary for dynamic titles and parameters
         """
         if isinstance(records, dict):
-            self.config = config or {}
+            # self.config = config or {}
             self._create_dashboard(records)
         else:
             print(f"GraphicsChartWriter: Expected dict, got {type(records)}")
 
-    def _create_dashboard(self, data: dict) -> None:
+    def _create_dashboard(self, data_dict: dict) -> None:
         """
         Create a multi-page dashboard with all visualizations.
 
@@ -95,50 +95,59 @@ class GraphicsChartWriter:
         self.app = DashboardApp()
 
         # Get config values with defaults
-        year = self.config.get('year', 2023)
-        year_start = self.config.get('year_start', 2020)
-        year_end = self.config.get('year_end', 2023)
-        region = self.config.get('region', 'Africa')
+        # year = self.config.get('year', 2023)
+        # year_start = self.config.get('year_start', 2020)
+        # year_end = self.config.get('year_end', 2023)
+        # region = self.config.get('region', 'Africa')
 
         # Page 1: Top 10 Countries by GDP
-        if 'top_10_gdp' in data and not data['top_10_gdp'].empty:
-            p1 = self.app.add_new_page(f"Top 10 Countries by GDP ({year})")
-            self.app.add_element(p1, self._graph_top_10_gdp, data['top_10_gdp'])
+        if 'top_10_gdp' in data_dict and not data_dict['top_10_gdp']["data"].empty:
+            # p1 = self.app.add_new_page(f"Top 10 Countries by GDP ({year})")
+            p1 = self.app.add_new_page(data_dict['top_10_gdp'].get("title"))
+            self.app.add_element(p1, self._graph_top_10_gdp, data_dict['top_10_gdp'].get("data"))
 
         # Page 2: Bottom 10 Countries by GDP
-        if 'bottom_10_gdp' in data and not data['bottom_10_gdp'].empty:
-            p2 = self.app.add_new_page(f"Bottom 10 Countries by GDP ({year})")
-            self.app.add_element(p2, self._graph_bottom_10_gdp, data['bottom_10_gdp'])
+        if 'bottom_10_gdp' in data_dict and not data_dict['bottom_10_gdp']['data'].empty:
+            # p2 = self.app.add_new_page(f"Bottom 10 Countries by GDP ({year})")
+            p2 = self.app.add_new_page(data_dict['bottom_10_gdp'].get("title"))
+            self.app.add_element(p2, self._graph_bottom_10_gdp, data_dict['bottom_10_gdp'].get("data"))
 
         # Page 3: GDP Growth Rate
-        if 'gdp_growth_rate' in data and not data['gdp_growth_rate'].empty:
-            p3 = self.app.add_new_page(f"GDP Growth Rate by Country ({year_start}-{year_end})")
-            self.app.add_element(p3, self._graph_gdp_growth_rate, data['gdp_growth_rate'])
+        if 'gdp_growth_rate' in data_dict and not data_dict['gdp_growth_rate']['data'].empty:
+            # p3 = self.app.add_new_page(f"GDP Growth Rate by Country ({year_start}-{year_end})")
+            p3 = self.app.add_new_page(data_dict['gdp_growth_rate'].get("title"))
+            self.app.add_element(p3, self._graph_gdp_growth_rate, data_dict['gdp_growth_rate'].get("data"))
 
         # Page 4: Average GDP by Continent
-        if 'avg_gdp_by_continent' in data and not data['avg_gdp_by_continent'].empty:
-            p4 = self.app.add_new_page(f"Average GDP by Continent ({year_start}-{year_end})")
-            self.app.add_element(p4, self._graph_avg_gdp_by_continent, data['avg_gdp_by_continent'])
+        if 'avg_gdp_by_continent' in data_dict and not data_dict['avg_gdp_by_continent']['data'].empty:
+            # p4 = self.app.add_new_page(f"Average GDP by Continent ({year_start}-{year_end})")
+            p4 = self.app.add_new_page(data_dict['avg_gdp_by_continent'].get("title"))
+            self.app.add_element(p4, self._graph_avg_gdp_by_continent, data_dict['avg_gdp_by_continent'].get("data"))
 
         # Page 5: Global GDP Trend
-        if 'global_gdp_trend' in data and not data['global_gdp_trend'].empty:
-            p5 = self.app.add_new_page(f"Total Global GDP Trend ({year_start}-{year_end})")
-            self.app.add_element(p5, self._graph_global_gdp_trend, data['global_gdp_trend'])
+        if 'global_gdp_trend' in data_dict and not data_dict['global_gdp_trend']['data'].empty:
+            # p5 = self.app.add_new_page(f"Total Global GDP Trend ({year_start}-{year_end})")
+            p5 = self.app.add_new_page(data_dict['global_gdp_trend'].get("title"))
+            self.app.add_element(p5, self._graph_global_gdp_trend, data_dict['global_gdp_trend'].get("data"))
 
         # Page 6: Fastest Growing Continent
-        if 'fastest_growing_continent' in data and not data['fastest_growing_continent'].empty:
-            p6 = self.app.add_new_page(f"Fastest Growing Continents ({year_start}-{year_end})")
-            self.app.add_element(p6, self._graph_fastest_growing_continent, data['fastest_growing_continent'])
+        if 'fastest_growing_continent' in data_dict and not data_dict['fastest_growing_continent']['data'].empty:
+            # p6 = self.app.add_new_page(f"Fastest Growing Continents ({year_start}-{year_end})")
+            p6 = self.app.add_new_page(data_dict['fastest_growing_continent'].get("title"))
+            self.app.add_element(p6, self._graph_fastest_growing_continent, data_dict['fastest_growing_continent'].get("data"))
 
         # Page 7: Countries with Consistent Decline
-        if 'countries_with_consistent_decline' in data and not data['countries_with_consistent_decline'].empty:
-            p7 = self.app.add_new_page(f"Countries with Consistent GDP Decline ({region})")
-            self.app.add_element(p7, self._graph_countries_with_decline, data['countries_with_consistent_decline'])
+        if 'countries_with_consistent_decline' in data_dict and not data_dict['countries_with_consistent_decline']['data'].empty:
+            # p7 = self.app.add_new_page(f"Countries with Consistent GDP Decline ({region})")
+            p7 = self.app.add_new_page(data_dict['countries_with_consistent_decline'].get("title"))
+            self.app.add_element(p7, self._graph_countries_with_decline, data_dict['countries_with_consistent_decline'].get("data"))
+
 
         # Page 8: Continent Contribution to Global GDP
-        if 'continent_contribution' in data and not data['continent_contribution'].empty:
-            p8 = self.app.add_new_page(f"Continent Contribution to Global GDP ({year_start}-{year_end})")
-            self.app.add_element(p8, self._graph_continent_contribution, data['continent_contribution'])
+        if 'continent_contribution' in data_dict and not data_dict['continent_contribution']['data'].empty:
+            p8 = self.app.add_new_page(data_dict['continent_contribution'].get("title"))
+            # p8 = self.app.add_new_page(f"Continent Contribution to Global GDP ({year_start}-{year_end})")
+            self.app.add_element(p8, self._graph_continent_contribution, data_dict['continent_contribution'].get("data"))
 
         # Run the dashboard
         self.app.run()
@@ -158,7 +167,7 @@ class GraphicsChartWriter:
             value = row['GDP_Value']
             ax.text(value, i, f' ${value:,.0f}B', va='center', fontweight='bold', fontsize=9)
 
-        year = self.config.get('year', 2023)
+        # year = self.config.get('year', 2023)
 
         ax.set_xlabel('GDP Value (Billions USD)', fontweight='bold', fontsize=11)
         ax.set_ylabel('Country', fontweight='bold', fontsize=11)
@@ -180,7 +189,7 @@ class GraphicsChartWriter:
             value = row['GDP_Value']
             ax.text(value, i, f' ${value:,.0f}B', va='center', fontweight='bold', fontsize=9)
 
-        year = self.config.get('year', 2023)
+        # year = self.config.get('year', 2023)
 
         ax.set_xlabel('GDP Value (Billions USD)', fontweight='bold', fontsize=11)
         ax.set_ylabel('Country', fontweight='bold', fontsize=11)
@@ -202,8 +211,8 @@ class GraphicsChartWriter:
             value = row['Growth_Rate_%']
             ax.text(i, value, f'{value:.1f}%', ha='center', va='bottom' if value > 0 else 'top', fontweight='bold', fontsize=9)
 
-        year_start = self.config.get('year_start', 2020)
-        year_end = self.config.get('year_end', 2023)
+        # year_start = self.config.get('year_start', 2020)
+        # year_end = self.config.get('year_end', 2023)
 
         ax.set_xticks(range(len(df_plot)))
         ax.set_xticklabels(df_plot['Country Name'], rotation=45, ha='right', fontsize=9)
@@ -216,7 +225,7 @@ class GraphicsChartWriter:
         Graph 4: Average GDP by Continent
         Donut chart showing average GDP distribution across continents.
         """
-        import matplotlib.patches as mpatches
+        # import matplotlib.patches as mpatches
 
         df_plot = df.copy().sort_values('Average_GDP', ascending=False)
 
@@ -292,7 +301,7 @@ class GraphicsChartWriter:
         if df.empty:
             region = self.config.get('region', 'Africa')
             ax.text(0.5, 0.5, 'No countries with consistent decline', ha='center', va='center',
-                   fontsize=12, fontweight='bold', transform=ax.transAxes)
+                    fontsize=12, fontweight='bold', transform=ax.transAxes)
             ax.set_xticks([])
             ax.set_yticks([])
             return
