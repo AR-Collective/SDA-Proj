@@ -1,9 +1,26 @@
+"""
+Graph Visualization Utilities
+
+Provides helper functions for creating various types of charts and graphs.
+Used by the GraphicsChartWriter to render visualizations.
+"""
+
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
 
 def humanize_numbers(df, value_col):
+    """
+    Convert large numbers to human-readable format (Trillions, Billions, Millions).
+
+    Args:
+        df: DataFrame containing the values
+        value_col: Column name with numeric values
+
+    Returns:
+        str: Unit name (Trillions, Billions, Millions, etc.)
+    """
     max_val = df[value_col].max()
     if max_val >= 1e12:
         df['Display_Val'] = df[value_col] / 1e12
@@ -21,6 +38,17 @@ def humanize_numbers(df, value_col):
 
 
 def barplot(df, value_col, label_col, palette='viridis', title_prefix="Total Contribution", ax=None):
+    """
+    Create a bar plot with humanized number labels.
+
+    Args:
+        df: DataFrame with data to plot
+        value_col: Column name for values (y-axis)
+        label_col: Column name for labels (x-axis)
+        palette: Seaborn color palette
+        title_prefix: Title for the plot
+        ax: Matplotlib axis object (optional)
+    """
     df_plot = df.copy()
 
     sns.set_theme(style="whitegrid")
@@ -59,6 +87,16 @@ def barplot(df, value_col, label_col, palette='viridis', title_prefix="Total Con
 
 
 def donutplot(data, value_col, label_col, title="Total GDP Contribution by Continent", ax=None):
+    """
+    Create a donut chart with legend.
+
+    Args:
+        data: DataFrame with data to plot
+        value_col: Column name for values
+        label_col: Column name for labels
+        title: Title for the chart
+        ax: Matplotlib axis object (optional)
+    """
     colors = sns.color_palette('viridis', len(data))
     target_ax = ax if ax else plt.gca()
     target_ax.pie(
@@ -88,30 +126,47 @@ def donutplot(data, value_col, label_col, title="Total GDP Contribution by Conti
 
 
 def line_plot(df, x_col, y_col, ax, region_name=""):
+    """
+    Create a line plot with filled area.
+
+    Args:
+        df: DataFrame with data to plot
+        x_col: Column name for x-axis
+        y_col: Column name for y-axis
+        ax: Matplotlib axis object
+        region_name: Name of region for title (optional)
+    """
     sns.lineplot(
         data=df, x=x_col, y=y_col,
         color='#2a9d8f', linewidth=2.5, marker='o', markersize=6, ax=ax
     )
     ax.fill_between(df[x_col], df[y_col], color='#2a9d8f', alpha=0.1)
 
-    title = f'Annual GDP Growth Trend - {
-        region_name}' if region_name else 'Annual GDP Growth Trend'
+    title = f'Annual GDP Growth Trend - {region_name}' if region_name else 'Annual GDP Growth Trend'
     ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
     ax.set_ylabel(y_col, fontweight='bold')
-    # 10 year as one warna overcrowding
     ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
     sns.despine(ax=ax, left=True)
 
 
 def scatter_plot(df, x_col, y_col, ax, region_name=""):
+    """
+    Create a scatter plot with regression line.
+
+    Args:
+        df: DataFrame with data to plot
+        x_col: Column name for x-axis
+        y_col: Column name for y-axis
+        ax: Matplotlib axis object
+        region_name: Name of region for title (optional)
+    """
     sns.regplot(
         data=df, x=x_col, y=y_col,
         scatter_kws={'alpha': 0.4, 'color': '#e76f51', 's': 40},
         line_kws={'color': '#264653', 'linewidth': 2},
         ax=ax, ci=None
     )
-    title = f'GDP Distribution & Regression - {
-        region_name}' if region_name else 'GDP Distribution & Regression'
+    title = f'GDP Distribution & Regression - {region_name}' if region_name else 'GDP Distribution & Regression'
     ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
     ax.set_ylabel(y_col, fontweight='bold')
     ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
@@ -119,6 +174,15 @@ def scatter_plot(df, x_col, y_col, ax, region_name=""):
 
 
 def show_dashboard(df_by_region, df_by_year, region_name="", year=None):
+    """
+    Create and display a comprehensive 2x2 dashboard with multiple charts.
+
+    Args:
+        df_by_region: DataFrame grouped by region
+        df_by_year: DataFrame grouped by year
+        region_name: Name of region for titles
+        year: Year for titles (optional)
+    """
     fig, axes = plt.subplots(2, 2, figsize=(18, 12))
     fig.suptitle("Comprehensive GDP Analysis Dashboard",
                  fontsize=20, fontweight="bold")
@@ -129,13 +193,11 @@ def show_dashboard(df_by_region, df_by_year, region_name="", year=None):
     scatter_plot(df_by_year, 'Year', 'GDP_Value',
                  axes[0, 1], region_name=region_name)
 
-    title_bar = f"Total GDP Contribution by Continent in {
-        year}" if year else "Total GDP Contribution by Continent"
+    title_bar = f"Total GDP Contribution by Continent in {year}" if year else "Total GDP Contribution by Continent"
     barplot(df_by_region, 'GDP_Value', 'Continent',
             ax=axes[1, 0], title_prefix=title_bar)
 
-    title_donut = f"Total GDP Distribution by Continent in {
-        year}" if year else "Total GDP Distribution by Continent"
+    title_donut = f"Total GDP Distribution by Continent in {year}" if year else "Total GDP Distribution by Continent"
     donutplot(df_by_region, 'GDP_Value', 'Continent',
               title=title_donut, ax=axes[1, 1])
 

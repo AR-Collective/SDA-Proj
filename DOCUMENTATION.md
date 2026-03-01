@@ -125,6 +125,57 @@ The Sphinx documentation auto-generates docstrings from the source code, so ever
 
 ---
 
+## Project Structure
+
+The project follows strict **Dependency Inversion Principle (DIP)** with clear separation of concerns:
+
+```
+SDA-Proj/
+├── main.py                          # Bootstrap orchestrator
+├── config.json                      # Configuration file
+│
+├── core/                            # Core module - CONTRACTS ONLY
+│   ├── contracts.py                 # DataSink & PipelineService protocols
+│   ├── engine.py                    # TransformationEngine (8 analyses)
+│   ├── cleaner_engine.py
+│   ├── melting_engine.py
+│   └── filter_engine.py
+│
+├── plugins/                         # Plugin modules - IMPLEMENTATION
+│   ├── inputs/                      # LEFT SIDE: Input Drivers
+│   │   ├── csv_reader.py           # CSV file loading
+│   │   └── json_reader.py          # JSON file loading
+│   │
+│   └── outputs/                     # RIGHT SIDE: Output Drivers + Visualization
+│       ├── console_writer.py        # Console output implementation
+│       ├── graphics_writer.py       # Dashboard implementation
+│       ├── dashboard.py             # Multi-page app framework
+│       └── graphs.py                # Visualization utilities
+│
+└── data/                            # Datasets
+    ├── gdp_with_continent_filled.csv
+    └── gdp_with_continent_filled.json
+```
+
+### DIP Architecture Breakdown
+
+| Component | Location | Role | Dependencies |
+|-----------|----------|------|--------------|
+| **Protocols** | `core/contracts.py` | Define interfaces | None (defines everything) |
+| **Engine** | `core/engine.py` | Business logic | Depends on protocols via injection |
+| **Input Plugins** | `plugins/inputs/` | Load data | Depend on input interface only |
+| **Output Plugins** | `plugins/outputs/` | Write results | Depend on DataSink protocol only |
+| **Bootstrap** | `main.py` | Orchestration | Connects everything without tight coupling |
+
+**Key Design Points:**
+- ✅ Core owns the protocols (not the other way around)
+- ✅ Plugins implement protocols, never touch core
+- ✅ Inputs and outputs are completely isolated on left/right sides
+- ✅ main.py is the only file that knows about all modules
+- ✅ Adding new driver requires NO changes to core or other plugins
+
+---
+
 ## Phase 2 Components
 
 ### 1. Core Module: `core/contracts.py`
@@ -165,25 +216,27 @@ The Sphinx documentation auto-generates docstrings from the source code, so ever
 
 ### 3. Plugins: Input Drivers
 
-**Location**: `plugins/inputs.py`
+**Location**: `plugins/inputs/`
 
 **Available Drivers:**
-- `CsvReader` - Load data from CSV file
-- `JsonReader` - Load data from JSON file
+- `CsvReader` (in `csv_reader.py`) - Load data from CSV file
+- `JsonReader` (in `json_reader.py`) - Load data from JSON file
 
-**Interface**: Both return raw data (list or list-of-dicts) compatible with `TransformationEngine`
+**Interface**: Both return raw data (pandas DataFrame) compatible with `TransformationEngine`
 
 ### 4. Plugins: Output Drivers
 
-**Location**: `plugins/outputs.py`
+**Location**: `plugins/outputs/`
 
 **Available Drivers:**
 
-- **`ConsoleWriter`** - Print results to console with formatted tables
+- **`ConsoleWriter`** (in `console_writer.py`) - Print results to console with formatted tables
   - Handles DataFrames and dictionaries
   - Clean, readable terminal output
 
-- **`GraphicsChartWriter`** - Interactive 8-page dashboard
+- **`GraphicsChartWriter`** (in `graphics_writer.py`) - Interactive 8-page dashboard
+  - Uses `DashboardApp` (in `dashboard.py`) for multi-page framework
+  - Uses `graphs.py` utilities for all visualizations
   - Page 1: Top 10 Countries by GDP (bar chart)
   - Page 2: Bottom 10 Countries by GDP (bar chart)
   - Page 3: GDP Growth Rate by Country (bar chart)

@@ -492,24 +492,31 @@ SDA-Proj/
 ├── requirements.txt                 # Python dependencies
 ├── README.md                        # This file
 ├── DOCUMENTATION.md                 # Points to Sphinx docs
+├── UMLDesign.html                   # Interactive UML diagram viewer
 ├── index.html → docs/build/html    # Symlink to Sphinx docs
 │
-├── core/                            # Core module (defines contracts)
+├── core/                            # Core module (defines contracts only)
 │   ├── __init__.py
 │   ├── contracts.py                 # DataSink & PipelineService protocols
-│   └── engine.py                    # TransformationEngine (8 analyses)
+│   ├── engine.py                    # TransformationEngine (8 analyses)
+│   ├── cleaner_engine.py            # Data cleaning utilities
+│   ├── melting_engine.py            # Data reshaping utilities
+│   └── filter_engine.py             # Data filtering utilities
 │
 ├── plugins/                         # Plugin modules (implement protocols)
 │   ├── __init__.py
-│   ├── inputs/
-│   │   ├── __init__.py
-│   │   ├── csv_driver.py           # CSV input implementation
-│   │   └── json_driver.py          # JSON input implementation
 │   │
-│   └── outputs/
+│   ├── inputs/                      # LEFT SIDE: INPUT PLUGINS
+│   │   ├── __init__.py
+│   │   ├── csv_reader.py            # CSV input driver
+│   │   └── json_reader.py           # JSON input driver
+│   │
+│   └── outputs/                     # RIGHT SIDE: OUTPUT PLUGINS
 │       ├── __init__.py
-│       ├── console.py              # Console output (DataSink)
-│       └── graphics.py             # Dashboard output (DataSink)
+│       ├── console_writer.py        # Console output (DataSink)
+│       ├── graphics_writer.py       # Dashboard output (DataSink)
+│       ├── dashboard.py             # Multi-page dashboard framework
+│       └── graphs.py                # Graph visualization utilities
 │
 ├── data/                            # Dataset directory
 │   ├── gdp_with_continent_filled.csv
@@ -517,12 +524,22 @@ SDA-Proj/
 │
 └── docs/                            # Sphinx documentation
     ├── Makefile
+    ├── design.uml                   # PlantUML architecture diagram
     ├── build/html/                 # Generated HTML (linked from index.html)
     ├── source/
     │   ├── conf.py
     │   └── *.rst
     └── ...
 ```
+
+### Architecture Key (DIP Principle)
+
+- **core/** - Defines contracts (Protocols) only, no implementation details
+- **plugins/inputs/** - All input data loading on the LEFT side
+- **plugins/outputs/** - All output visualization on the RIGHT side (includes dashboard framework and graph utilities)
+- **main.py** - Bootstrap orchestration only, no business logic
+
+This structure perfectly implements the **Dependency Inversion Principle** with clear separation of concerns:
 
 ## 🎓 Key Learning Points (Phase 2)
 
