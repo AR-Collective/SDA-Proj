@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDA Phase 2 - UML Diagram Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 30px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1em;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            font-size: 1em;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+            font-size: 0.95em;
+            color: #1565c0;
+        }
+
+        .code-box {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .code-box pre {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            margin: 0;
+            color: #333;
+            white-space: pre;
+        }
+
+        .copy-btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: #764ba2;
+        }
+
+        .copy-feedback {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background: #d4edda;
+            color: #155724;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .editor-links {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .editor-links h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .editor-links a {
+            display: inline-block;
+            margin: 5px 5px 5px 0;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .editor-links a:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .step {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+
+        .step strong {
+            color: #667eea;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .container {
+                background: #2d2d2d;
+                color: #e0e0e0;
+            }
+
+            .content {
+                background: #2d2d2d;
+            }
+
+            .code-box {
+                background: #1e1e1e;
+                border-color: #444;
+            }
+
+            .code-box pre {
+                color: #e0e0e0;
+            }
+
+            .info-box {
+                background: #1e3a5f;
+                color: #90caf9;
+            }
+
+            .editor-links {
+                background: #1e1e1e;
+                color: #e0e0e0;
+                border-color: #444;
+            }
+
+            .editor-links h3 {
+                color: #e0e0e0;
+            }
+
+            .footer {
+                background: #1e1e1e;
+                border-top-color: #444;
+                color: #aaa;
+            }
+
+            .step {
+                background: #1e1e1e;
+                border-left-color: #667eea;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏗️ SDA Project Phase 2</h1>
+            <p>GDP Analysis Tool - UML Architecture Diagram</p>
+        </div>
+
+        <div class="content">
+            <div class="info-box">
+                Your <code>design.uml</code> file is ready! Use one of the online editors below to view the diagram.
+                Just click the button and the code will be automatically loaded.
+            </div>
+
+            <div class="button-group">
+                <a href="#" class="btn btn-primary" onclick="openPlantUML(); return false;">
+                    📊 View in PlantUML Online
+                </a>
+                <button class="btn btn-secondary" onclick="copyCode()">
+                    📋 Copy Code to Clipboard
+                </button>
+            </div>
+
+            <div class="editor-links">
+                <h3>🌐 Online Editors (Paste Code):</h3>
+                <a href="https://www.plantuml.com/plantuml/uml/" target="_blank">PlantUML Online Editor</a>
+                <a href="https://kroki.io/" target="_blank">Kroki.io</a>
+                <a href="https://app.diagrams.net/" target="_blank">Diagrams.net</a>
+            </div>
+
+            <h2 style="margin-top: 30px; margin-bottom: 20px; color: #333;">📝 Steps to View Your Diagram:</h2>
+
+            <div class="step">
+                <strong>Step 1:</strong> Click "View in PlantUML Online" button above (opens in new tab)
+            </div>
+
+            <div class="step">
+                <strong>Step 2:</strong> The diagram code should load automatically in the editor
+            </div>
+
+            <div class="step">
+                <strong>Step 3:</strong> If not, manually copy the code below and paste it in the editor
+            </div>
+
+            <div class="step">
+                <strong>Step 4:</strong> The UML diagram will render with all architecture elements:
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>Main Module (bootstrap orchestrator)</li>
+                    <li>Core Module (protocols & engine)</li>
+                    <li>Input Plugins (CSV & JSON readers)</li>
+                    <li>Output Plugins (Console & Graphics writers)</li>
+                    <li>Dependency injection flows</li>
+                </ul>
+            </div>
+
+            <h2 style="margin-top: 30px; margin-bottom: 15px; color: #333;">📄 UML Code (design.uml):</h2>
+
+            <button class="copy-btn" onclick="copyCode()">Copy All Code</button>
+            <div class="copy-feedback" id="copyFeedback">✓ Code copied to clipboard!</div>
+
+            <div class="code-box">
+                <textarea id="umlCode"
+                    style="width: 100%; height: 600px; border: none; background: transparent; font-family: 'Courier New', monospace; font-size: 0.9em; resize: none; color: #333;">@startuml
+skinparam style strictuml
+skinparam handwritten false
+skinparam packageStyle rectangle
+
+title GDP Analysis Tool
+
+package "Main" {
+    class main <<entry point>> {
+        + bootstrap()
+        + config_loader()
+    }
+}
+
+package "Core" {
+    interface PipelineService {
+        + read(filepath: str): raw_data
+    }
+
+    interface OutputWriter {
+        + write(data)
+    }
+
+    class TransformationEngine {
+        - sink: OutputWriter
+        + __init__(sink: OutputWriter)
+        + execute(raw_data, config)
+    }
+}
+
+package "Input Plugins" as InputPlugins {
+    class CsvReader {
+        + read(filepath: str): raw_data
+    }
+    class JsonReader {
+        + read(filepath: str): raw_data
+    }
+}
+
+package "Output Plguins" {
+    class ConsoleWriter {
+        + write(data)
+    }
+    class GraphicsChartWriter {
+        + write(data)
+    }
+}
+
+PipelineService <.. CsvReader : calls
+PipelineService <.. JsonReader : calls
+OutputWriter <|.. ConsoleWriter : implements
+OutputWriter <|.. GraphicsChartWriter : implements
+
+TransformationEngine o-- OutputWriter : "injected via constructor"
+TransformationEngine ..|> PipelineService
+
+' Orchestration Dependencies
+main ..> TransformationEngine : instantiates
+main ..> InputPlugins : instantiates via config
+main ..> OutputWriter : instantiates via config
+
+note right of main
+    Reads config.json
+    Instantiates OutputWriter
+    Injects it into TransformationEngine
+    Calls PipelineService.read()
+    Passes data to Engine.execute()
+end note
+
+@enduml</textarea>
+            </div>
+
+            <div class="info-box" style="margin-top: 30px;">
+                <strong>💡 Pro Tip:</strong> You can also save this diagram as PNG/SVG in most online editors. This is
+                great for including in presentations or documentation!
+            </div>
+        </div>
+
+        <div class="footer">
+            SDA Project Phase 2 | Dependency Inversion Principle Architecture | March 2026
+        </div>
+    </div>
+
+    <script>
+        function copyCode() {
+            const codeElement = document.getElementById('umlCode');
+            const text = codeElement.textContent;
+
+            // Create temporary textarea to copy from
+            const textarea = document.createElement('textarea');
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            textarea.value = text;
+            document.body.appendChild(textarea);
+
+            // Select and copy
+            textarea.select();
+            textarea.setSelectionRange(0, 99999);
+
+            try {
+                document.execCommand('copy');
+                const feedback = document.getElementById('copyFeedback');
+                feedback.style.display = 'block';
+                setTimeout(() => {
+                    feedback.style.display = 'none';
+                }, 3000);
+            } catch (err) {
+                alert('Failed to copy. Ensure you\'re using a modern browser.');
+            }
+
+            document.body.removeChild(textarea);
+        }
+
+        function openPlantUML() {
+            // Get the UML code
+            const codeElement = document.getElementById('umlCode');
+            const code = codeElement.value;
+
+            // Copy code to clipboard
+            const textarea = document.createElement('textarea');
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            textarea.value = code;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            // Show feedback
+            const feedback = document.getElementById('copyFeedback');
+            feedback.textContent = '✓ Code copied! Opening PlantUML...';
+            feedback.style.display = 'block';
+
+            // Open PlantUML editor in new tab
+            setTimeout(() => {
+                window.open('https://www.plantuml.com/plantuml/uml/', '_blank');
+                setTimeout(() => {
+                    feedback.textContent = '✓ Paste with Ctrl+V (or Cmd+V on Mac)';
+                    setTimeout(() => {
+                        feedback.style.display = 'none';
+                        feedback.textContent = '✓ Code copied to clipboard!';
+                    }, 3000);
+                }, 500);
+            }, 300);
+        }
+    </script>
+</body>
+
+</html>

@@ -16,6 +16,31 @@ Phase 2 transforms Phase 1's functional approach into a **scalable, enterprise-g
 
 ## 📊 Architecture
 
+### UML Design Diagram
+
+View the complete system architecture in the interactive UML diagram:
+
+👉 **[🏗️ View UML Architecture Diagram](./UMLDesign.html)** – Interactive diagram viewer with one-click PlantUML rendering
+
+**How to use:**
+- **Open the file**:
+  - macOS: `open UMLDesign.html`
+  - Linux: `xdg-open UMLDesign.html`
+  - Windows: `start UMLDesign.html`
+- Click "📊 View in PlantUML Online" button
+- Code automatically copies to clipboard
+- Press **Ctrl+V** (Cmd+V on Mac) in PlantUML to paste and render
+
+**View the UML code:**
+- 📄 **[design.uml](./docs/design.uml)** – Raw UML source code
+
+The diagram shows:
+- Main module (bootstrap orchestrator)
+- Core module (PipelineService, OutputWriter, TransformationEngine)
+- Input Plugins (CsvReader, JsonReader)
+- Output Plugins (ConsoleWriter, GraphicsChartWriter)
+- Dependency injection flows and orchestration relationships
+
 ### Core Module (Contracts)
 
 Defines abstract interfaces using Python `Protocol`:

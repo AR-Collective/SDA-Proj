@@ -43,6 +43,24 @@ The application will:
 
 **Phase 2** implements **Dependency Inversion Principle (DIP)** with a modular, plugin-based architecture.
 
+### UML Design Diagram
+
+View the complete system architecture in an interactive UML diagram:
+
+👉 **[🏗️ View UML Architecture Diagram](./UMLDesign.html)** – Interactive diagram viewer with one-click PlantUML rendering
+
+**How to use:**
+- **Open the file**:
+  - macOS: `open UMLDesign.html`
+  - Linux: `xdg-open UMLDesign.html`
+  - Windows: `start UMLDesign.html`
+- Click "📊 View in PlantUML Online" button
+- Code automatically copies to clipboard
+- Press **Ctrl+V** (Cmd+V on Mac) in PlantUML to paste and render diagram
+
+**View the UML code:**
+- 📄 **[design.uml](./docs/design.uml)** – Raw UML source code in PlantUML format
+
 ### Key Design Principles
 
 - **Dependency Inversion**: Core module owns Protocols; external modules implement them
