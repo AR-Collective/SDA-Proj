@@ -13,7 +13,7 @@ package "Main" {
 }
 
 package "Core" {
-    interface InputReader {
+    interface PipelineService {
         + read(filepath: str): raw_data
     }
     
@@ -28,7 +28,7 @@ package "Core" {
     }
 }
 
-package "Input Plugins" {
+package "Input Plugins" as InputPlugins {
     class CsvReader {
         + read(filepath: str): raw_data
     }
@@ -46,23 +46,24 @@ package "Output Plguins" {
     }
 }
 
-InputReader <|.. CsvReader : implements
-InputReader <|.. JsonReader : implements
+PipelineService <.. CsvReader : calls
+PipelineService <.. JsonReader : calls
 OutputWriter <|.. ConsoleWriter : implements
 OutputWriter <|.. GraphicsChartWriter : implements
 
 TransformationEngine o-- OutputWriter : "injected via constructor"
+TransformationEngine ..|> PipelineService
 
 ' Orchestration Dependencies
 main ..> TransformationEngine : instantiates
-main ..> InputReader : instantiates via config
+main ..> InputPlugins : instantiates via config
 main ..> OutputWriter : instantiates via config
 
 note right of main
   Reads config.json
   Instantiates OutputWriter
   Injects it into TransformationEngine
-  Calls InputReader.read()
+  Calls PipelineService.read()
   Passes data to Engine.execute()
 end note
 
