@@ -5,12 +5,17 @@ from .contracts import DataSink, PipelineService
 from typing import List, Any
 import pandas as pd
 
+def build_result(title: str, data):
+    return {
+        "title": title,
+        "data": data
+    }
 class TransformationEngine(PipelineService):
     def __init__(self, sink: DataSink):
-        # The specific writer is 'injected' at runtime
         self.sink = sink
+
+
     def execute(self, raw_data: List[Any], config_array) -> None:
-        # Top 10 Countries by GDP for the given continent & year
 
         long_data = reshape_to_long_format(raw_data)
         df_clean = clean_dataframe(
@@ -20,7 +25,6 @@ class TransformationEngine(PipelineService):
             remove_duplicates=True
         )
 
-        # HELPERS
         df_by_region = (
             df_clean
             .pipe(filter.year, config_array['year'])
@@ -108,19 +112,69 @@ class TransformationEngine(PipelineService):
             config_array['year_end']
         )
 
+
         ret_data = {
-            "top_10_gdp": top_10_gdp,
-            "bottom_10_gdp": bottom_10_gdp,
-            "gdp_growth_rate": gdp_growth_rate,
-            "avg_gdp_by_continent": avg_gdp_by_continent,
-            "global_gdp_trend": global_gdp_trend,
-            "fastest_growing_continent": fastest_growing_continent,
-            "countries_with_consistent_decline": countries_with_decline,
-            "continent_contribution": continent_contribution,
+            "top_10_gdp": build_result(
+                f"Top 10 GDP Countries in {config_array['region']} ({config_array['year']})",
+                top_10_gdp
+            ),
+
+            "bottom_10_gdp": build_result(
+                f"Bottom 10 GDP Countries in {config_array['region']} ({config_array['year']})",
+                bottom_10_gdp
+            ),
+
+            "gdp_growth_rate": build_result(
+                f"GDP Growth Rate in {config_array['region']} "
+                f"from {config_array['year_start']} to {config_array['year_end']}",
+                gdp_growth_rate
+            ),
+
+            "avg_gdp_by_continent": build_result(
+                f"Average GDP by Continent "
+                f"({config_array['year_start']}–{config_array['year_end']})",
+                avg_gdp_by_continent
+            ),
+
+            "global_gdp_trend": build_result(
+                f"Global GDP Trend "
+                f"({config_array['year_start']}–{config_array['year_end']})",
+                global_gdp_trend
+            ),
+
+            "fastest_growing_continent": build_result(
+                f"Fastest Growing Continent "
+                f"({config_array['year_start']}–{config_array['year_end']})",
+                fastest_growing_continent
+            ),
+
+            "countries_with_consistent_decline": build_result(
+                f"Countries with Consistent GDP Decline in "
+                f"{config_array['region']} "
+                f"(Last {config_array.get('trend_window_years', 5)} Years)",
+                countries_with_decline
+            ),
+
+            "continent_contribution": build_result(
+                f"Continent Contribution to Global GDP "
+                f"({config_array['year_start']}–{config_array['year_end']})",
+                continent_contribution
+            ),
         }
-        self.sink.write(ret_data, config_array)
+        self.sink.write(ret_data)
 
     def _calculate_growth_rate(self, df, region, year_start, year_end):
+        """
+
+        Args:
+            df (): 
+            region (): 
+            year_start (): 
+            year_end (): 
+
+        Returns:
+
+        """
         """
         Calculate GDP growth rate for each country in a region between two years.
         Growth Rate = ((End_Value - Start_Value) / Start_Value) * 100
@@ -141,10 +195,19 @@ class TransformationEngine(PipelineService):
         result = merged.sort_values('Growth_Rate_%', ascending=False)[['Country Name', 'GDP_Start', 'GDP_End', 'Growth_Rate_%']]
         return result
 
-    def _calculate_average_gdp_by_continent(self, df, year_start, year_end):
+    def _calculate_average_gdp_by_continent(self, df, year_start, year_end) -> pd.DataFrame:
         """
         Calculate average GDP for each continent within the given year range.
         Returns continents sorted by average GDP descending.
+
+        Args:
+            df (pd.DataFrame): The input DataFrame containing GDP and Continent data.
+            year_start (int): The starting year of the range (inclusive).
+            year_end (int): The ending year of the range (inclusive).
+
+        Returns:
+            pd.DataFrame: A DataFrame containing 'Continent' and 'Average_GDP',
+                sorted by GDP in descending order and rounded to 2 decimal places.
         """
         # Filter data between year_start and year_end
         year_filtered = df[
@@ -169,6 +232,14 @@ class TransformationEngine(PipelineService):
         """
         Calculate total global GDP trend over the years in the given range.
         Returns Year and Total_GDP sorted by year ascending.
+
+        Args:
+            df (): 
+            year_start (): 
+            year_end (): 
+
+        Returns:
+
         """
         # Filter for Global entries within the year range
         global_data = df[
@@ -202,6 +273,15 @@ class TransformationEngine(PipelineService):
         Calculate which continent has the highest growth rate between two years.
         Growth Rate = ((End_GDP - Start_GDP) / Start_GDP) * 100
         Returns continents sorted by growth rate descending.
+
+        Args:
+            df: Clean DataFrame
+            year_start: Starting Year DataFrame
+            year_end: End Year DataFrame
+
+        Returns:
+            Resulting DataFrame
+
         """
         # Get data for start and end years, group by continent
         start_data = (
@@ -248,6 +328,8 @@ class TransformationEngine(PipelineService):
             region: The region/continent to analyze
             reference_year: The end year for the window
             window_years: Number of years to look back
+        Returns:
+            DataFrame
         """
         # Filter data for the region
         region_data = df.pipe(filter.region, region)
