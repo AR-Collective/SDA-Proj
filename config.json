@@ -1,6 +1,6 @@
 {
-  "input_format": "csv",
-  "filepath": "data/gdp_with_continent_filled.csv",
+  "input_format": "json",
+  "filepath": "data/gdp_with_continent_filled.json",
   "output_format": "graphics",
   "scope": "continent",
   "region": "Africa",

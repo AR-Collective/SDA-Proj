@@ -261,8 +261,8 @@ class GraphicsChartWriter:
         colors = plt.cm.Blues(np.linspace(0.4, 0.9, len(df_plot)))
         bars = ax.bar(df_plot['Year'], df_plot['Total_GDP'], color=colors, edgecolor='darkblue', linewidth=1.2, alpha=0.8)
 
-        year_start = self.config.get('year_start', 2020)
-        year_end = self.config.get('year_end', 2023)
+        # year_start = self.config.get('year_start', 2020)
+        # year_end = self.config.get('year_end', 2023)
 
         ax.set_xlabel('Year', fontweight='bold', fontsize=11)
         ax.set_ylabel('Total GDP (Billions USD)', fontweight='bold', fontsize=11)
@@ -284,8 +284,8 @@ class GraphicsChartWriter:
             value = row['Growth_Rate_%']
             ax.text(i, value, f'{value:.1f}%', ha='center', va='bottom' if value > 0 else 'top', fontweight='bold', fontsize=10)
 
-        year_start = self.config.get('year_start', 2020)
-        year_end = self.config.get('year_end', 2023)
+        # year_start = self.config.get('year_start', 2020)
+        # year_end = self.config.get('year_end', 2023)
 
         ax.set_xticks(range(len(df_plot)))
         ax.set_xticklabels(df_plot['Continent'], rotation=45, ha='right', fontsize=10)
@@ -299,7 +299,7 @@ class GraphicsChartWriter:
         Horizontal bar chart showing decline rate percentage for each country.
         """
         if df.empty:
-            region = self.config.get('region', 'Africa')
+            # region = self.config.get('region', 'Africa')
             ax.text(0.5, 0.5, 'No countries with consistent decline', ha='center', va='center',
                     fontsize=12, fontweight='bold', transform=ax.transAxes)
             ax.set_xticks([])
@@ -316,7 +316,7 @@ class GraphicsChartWriter:
             value = row['Decline_Rate_%']
             ax.text(value, i, f' {value:.1f}%', va='center', fontweight='bold', fontsize=9)
 
-        region = self.config.get('region', 'Africa')
+        # region = self.config.get('region', 'Africa')
 
         ax.set_xlabel('Decline Rate (%)', fontweight='bold', fontsize=11)
         ax.set_ylabel('Country', fontweight='bold', fontsize=11)
