@@ -181,17 +181,34 @@ def clean_dataframe(
     duplicate_subset: List[str] = None
 ) -> pd.DataFrame:
     """
-    -> upar walay sb functions iske liye bnaye thy. functional approac ;)
-    Cleaned DataFrame return
+    Executes the main data cleaning pipeline using a functional approach.
+
+    This function acts as the primary orchestrator for the cleaning module,
+    applying a series of specialized, smaller cleaning functions (like removing
+    duplicates and handling missing values) to produce a finalized dataset.
+
+    Args:
+        df (pd.DataFrame): The original DataFrame to be cleaned.
+        handle_missing (bool, optional): Whether to process and impute missing values.
+            Defaults to True.
+        missing_strategy (str, optional): The strategy to use for imputing numeric
+            missing values (e.g., 'mean', 'median'). Defaults to 'mean'.
+        remove_duplicates (bool, optional): Whether to drop duplicate rows.
+            Defaults to True.
+        duplicate_subset (List[str], optional): Specific column names to consider
+            when identifying duplicates. If None, all columns are considered.
+            Defaults to None.
+
+    Returns:
+        pd.DataFrame: A new, cleaned copy of the DataFrame with the specified
+            operations applied.
     """
 
     result = df.copy()
 
-    # Remove duplicates if requested
     if remove_duplicates:
         result = remove_duplicate_rows(result, subset=duplicate_subset)
 
-    # Handle missing values if requested
     if handle_missing:
         result = handle_missing_values_in_dataframe(
             result,
@@ -204,14 +221,15 @@ def clean_dataframe(
 
 def get_cleaning_summary(df_before: pd.DataFrame, df_after: pd.DataFrame) -> Dict:
     """
-    jo kam kia h uski summary return.
+    Generates a summary of the data cleaning operations performed.
 
     Args:
-        df_before: Original DataFrame before cleaning
-        df_after: Cleaned DataFrame
+        df_before (pd.DataFrame): The original DataFrame before cleaning.
+        df_after (pd.DataFrame): The resulting DataFrame after the cleaning process.
 
     Returns:
-        Dictionary containing cleaning summary
+        Dict: A dictionary containing the summary statistics and changes made
+            during the cleaning process (e.g., rows removed, missing values handled).
     """
 
     missing_before = detect_missing_values(df_before)
