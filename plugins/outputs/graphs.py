@@ -1,206 +1,186 @@
-"""
-Graph Visualization Utilities
-
-Provides helper functions for creating various types of charts and graphs.
-Used by the GraphicsChartWriter to render visualizations.
-"""
-
-import seaborn as sns
+import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 
-
-def humanize_numbers(df, value_col):
+def _graph_top_10_gdp(self, df: pd.DataFrame, ax) -> None:
     """
-    Convert large numbers to human-readable format (Trillions, Billions, Millions).
-
-    Args:
-        df: DataFrame containing the values
-        value_col: Column name with numeric values
-
-    Returns:
-        str: Unit name (Trillions, Billions, Millions, etc.)
+    Graph 1: Top 10 Countries by GDP
+    Horizontal bar chart showing the wealthiest countries.
     """
-    max_val = df[value_col].max()
-    if max_val >= 1e12:
-        df['Display_Val'] = df[value_col] / 1e12
-        unit = "Trillions"
-    elif max_val >= 1e9:
-        df['Display_Val'] = df[value_col] / 1e9
-        unit = "Billions"
-    elif max_val >= 1e6:
-        df['Display_Val'] = df[value_col] / 1e6
-        unit = "Millions"
-    else:
-        df['Display_Val'] = df[value_col]
-        unit = "Value"
-    return unit
+    df_plot = df.copy().sort_values('GDP_Value', ascending=True)
 
+    colors = plt.cm.Greens(range(len(df_plot)))
+    bars = ax.barh(df_plot['Country Name'], df_plot['GDP_Value'], color=colors, edgecolor='darkgreen', linewidth=1.2)
 
-def barplot(df, value_col, label_col, palette='viridis', title_prefix="Total Contribution", ax=None):
+    # Add value labels on bars
+    for i, (idx, row) in enumerate(df_plot.iterrows()):
+        value = row['GDP_Value']
+        ax.text(value, i, f' ${value:,.0f}B', va='center', fontweight='bold', fontsize=9)
+
+    ax.set_xlabel('GDP Value (Billions USD)', fontweight='bold', fontsize=11)
+    ax.set_ylabel('Country', fontweight='bold', fontsize=11)
+    ax.grid(axis='x', alpha=0.3, linestyle='--')
+    ax.invert_yaxis()
+
+def _graph_bottom_10_gdp(self, df: pd.DataFrame, ax) -> None:
     """
-    Create a bar plot with humanized number labels.
-
-    Args:
-        df: DataFrame with data to plot
-        value_col: Column name for values (y-axis)
-        label_col: Column name for labels (x-axis)
-        palette: Seaborn color palette
-        title_prefix: Title for the plot
-        ax: Matplotlib axis object (optional)
+    Graph 2: Bottom 10 Countries by GDP
+    Horizontal bar chart showing the least wealthy countries.
     """
-    df_plot = df.copy()
+    df_plot = df.copy().sort_values('GDP_Value', ascending=True)
 
-    sns.set_theme(style="whitegrid")
-    unit = humanize_numbers(df_plot, value_col)
-    df_sorted = df_plot.sort_values(by='Display_Val')
+    colors = plt.cm.Reds(range(len(df_plot)))
+    bars = ax.barh(df_plot['Country Name'], df_plot['GDP_Value'], color=colors, edgecolor='darkred', linewidth=1.2)
 
-    if ax is None:
-        plt.figure(figsize=(10, 6))
-    barplot = sns.barplot(
-        x=label_col,
-        y='Display_Val',
-        data=df_sorted,
-        palette=palette,
-        hue=label_col,
-        legend=False,
-        ax=ax
+    # Add value labels on bars
+    for i, (idx, row) in enumerate(df_plot.iterrows()):
+        value = row['GDP_Value']
+        ax.text(value, i, f' ${value:,.0f}B', va='center', fontweight='bold', fontsize=9)
+
+    ax.set_xlabel('GDP Value (Billions USD)', fontweight='bold', fontsize=11)
+    ax.set_ylabel('Country', fontweight='bold', fontsize=11)
+    ax.grid(axis='x', alpha=0.3, linestyle='--')
+    ax.invert_yaxis()
+
+def _graph_gdp_growth_rate(self, df: pd.DataFrame, ax) -> None:
+    """
+    Graph 3: GDP Growth Rate by Country
+    Vertical bar chart showing growth percentage for each country.
+    """
+    df_plot = df.copy().sort_values('Growth_Rate_%', ascending=False).head(10)
+
+    colors = ['green' if x > 0 else 'red' for x in df_plot['Growth_Rate_%']]
+    bars = ax.bar(range(len(df_plot)), df_plot['Growth_Rate_%'], color=colors, edgecolor='black', linewidth=1.2, alpha=0.8)
+
+    # Add value labels on bars
+    for i, (idx, row) in enumerate(df_plot.iterrows()):
+        value = row['Growth_Rate_%']
+        ax.text(i, value, f'{value:.1f}%', ha='center', va='bottom' if value > 0 else 'top', fontweight='bold', fontsize=9)
+
+    ax.set_xticks(range(len(df_plot)))
+    ax.set_xticklabels(df_plot['Country Name'], rotation=45, ha='right', fontsize=9)
+    ax.set_ylabel('Growth Rate (%)', fontweight='bold', fontsize=11)
+    ax.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+
+def _graph_avg_gdp_by_continent(self, df: pd.DataFrame, ax) -> None:
+    """
+    Graph 4: Average GDP by Continent
+    Donut chart showing average GDP distribution across continents.
+    """
+    df_plot = df.copy().sort_values('Average_GDP', ascending=False)
+
+    colors = plt.cm.Set3(range(len(df_plot)))
+    wedges, texts, autotexts = ax.pie(
+        df_plot['Average_GDP'],
+        labels=df_plot['Continent'],
+        autopct='%1.1f%%',
+        startangle=140,
+        colors=colors,
+        pctdistance=0.85,
+        explode=[0.05] * len(df_plot),
+        textprops={'fontweight': 'bold', 'fontsize': 10}
     )
-    ax.set_title(title_prefix, fontsize=14, fontweight='bold', pad=15)
-    ax.set_ylabel("Total GDP (" + unit + ")", fontweight="bold")
-    ax.set_xlabel("")
-
-    for p in barplot.patches:
-        val = p.get_height()
-        if val > 0:
-            barplot.annotate(
-                f'{val:.1f}',
-                (p.get_x() + p.get_width() / 2., val),
-                ha='center', va='center',
-                xytext=(0, 10),
-                textcoords='offset points',
-                fontweight='bold'
-            )
-
-    target_ax = ax if ax else plt.gca()
-    sns.despine(ax=target_ax)
-
-
-def donutplot(data, value_col, label_col, title="Total GDP Contribution by Continent", ax=None):
-    """
-    Create a donut chart with legend.
-
-    Args:
-        data: DataFrame with data to plot
-        value_col: Column name for values
-        label_col: Column name for labels
-        title: Title for the chart
-        ax: Matplotlib axis object (optional)
-    """
-    colors = sns.color_palette('viridis', len(data))
-    target_ax = ax if ax else plt.gca()
-    target_ax.pie(
-        data[value_col], labels=data[label_col], autopct='%1.1f%%',
-        startangle=140, colors=colors, pctdistance=0.85,
-        explode=[0.05] * len(data), textprops={'fontweight': 'bold'}
-    )
-
-    target_ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
 
     # Donut hole
     centre_circle = plt.Circle((0, 0), 0.70, fc='white')
-    target_ax.add_artist(centre_circle)
-    target_ax.axis('equal')
+    ax.add_artist(centre_circle)
+    ax.axis('equal')
 
-    legend = target_ax.legend(
-        data[label_col],
-        title=label_col,
-        loc="upper center",
-        bbox_to_anchor=(1, 0),
-        ncol=2,
-        fontsize=12
+    # Add legend with values
+    legend_labels = [f'{cont}: ${val:,.0f}B' for cont, val in zip(df_plot['Continent'], df_plot['Average_GDP'])]
+    ax.legend(legend_labels, loc='upper center', bbox_to_anchor=(1.1, 1), fontsize=9, frameon=True)
+
+def _graph_global_gdp_trend(self, df: pd.DataFrame, ax) -> None:
+    """
+    Graph 5: Global GDP Trend
+    Bar chart showing total global GDP by year.
+    """
+    df_plot = df.copy().sort_values('Year', ascending=True)
+
+    # Create bar chart with gradient colors
+    colors = plt.cm.Blues(np.linspace(0.4, 0.9, len(df_plot)))
+    bars = ax.bar(df_plot['Year'], df_plot['Total_GDP'], color=colors, edgecolor='darkblue', linewidth=1.2, alpha=0.8)
+
+    ax.set_xlabel('Year', fontweight='bold', fontsize=11)
+    ax.set_ylabel('Total GDP (Billions USD)', fontweight='bold', fontsize=11)
+    ax.set_xticks(df_plot['Year'].unique())
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+
+def _graph_fastest_growing_continent(self, df: pd.DataFrame, ax) -> None:
+    """
+    Graph 6: Fastest Growing Continents
+    Vertical bar chart showing growth rate percentage for each continent.
+    """
+    df_plot = df.copy().sort_values('Growth_Rate_%', ascending=False)
+
+    colors = ['green' if x > 0 else 'red' for x in df_plot['Growth_Rate_%']]
+    bars = ax.bar(range(len(df_plot)), df_plot['Growth_Rate_%'], color=colors, edgecolor='black', linewidth=1.2, alpha=0.8)
+
+    # Add value labels on bars
+    for i, (idx, row) in enumerate(df_plot.iterrows()):
+        value = row['Growth_Rate_%']
+        ax.text(i, value, f'{value:.1f}%', ha='center', va='bottom' if value > 0 else 'top', fontweight='bold', fontsize=10)
+
+    ax.set_xticks(range(len(df_plot)))
+    ax.set_xticklabels(df_plot['Continent'], rotation=45, ha='right', fontsize=10)
+    ax.set_ylabel('Growth Rate (%)', fontweight='bold', fontsize=11)
+    ax.axhline(y=0, color='black', linestyle='-', linewidth=1)
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+
+def _graph_countries_with_decline(self, df: pd.DataFrame, ax) -> None:
+    """
+    Graph 7: Countries with Consistent GDP Decline
+    Horizontal bar chart showing decline rate percentage for each country.
+    """
+    if df.empty:
+        ax.text(0.5, 0.5, 'No countries with consistent decline', ha='center', va='center',
+                fontsize=12, fontweight='bold', transform=ax.transAxes)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        return
+
+    df_plot = df.copy().sort_values('Decline_Rate_%', ascending=True)
+
+    colors = plt.cm.Oranges(np.linspace(0.4, 0.9, len(df_plot)))
+    bars = ax.barh(df_plot['Country Name'], df_plot['Decline_Rate_%'], color=colors, edgecolor='darkorange', linewidth=1.2)
+
+    # Add value labels on bars
+    for i, (idx, row) in enumerate(df_plot.iterrows()):
+        value = row['Decline_Rate_%']
+        ax.text(value, i, f' {value:.1f}%', va='center', fontweight='bold', fontsize=9)
+
+    ax.set_xlabel('Decline Rate (%)', fontweight='bold', fontsize=11)
+    ax.set_ylabel('Country', fontweight='bold', fontsize=11)
+    ax.grid(axis='x', alpha=0.3, linestyle='--')
+    ax.invert_yaxis()
+
+def _graph_continent_contribution(self, df: pd.DataFrame, ax) -> None:
+    """
+    Graph 8: Continent Contribution to Global GDP
+    Donut chart showing each continent's percentage contribution to total global GDP.
+    """
+    df_plot = df.copy().sort_values('Contribution_%', ascending=False)
+
+    colors = plt.cm.Pastel1(range(len(df_plot)))
+    wedges, texts, autotexts = ax.pie(
+        df_plot['Contribution_%'],
+        labels=df_plot['Continent'],
+        autopct='%1.1f%%',
+        startangle=90,
+        colors=colors,
+        pctdistance=0.85,
+        explode=[0.05] * len(df_plot),
+        textprops={'fontweight': 'bold', 'fontsize': 10}
     )
-    legend.get_title().set_fontweight('bold')
-    for text in legend.get_texts():
-        text.set_fontweight('bold')
+
+    # Donut hole
+    centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+    ax.add_artist(centre_circle)
+    ax.axis('equal')
+
+    # Add legend with GDP values
+    legend_labels = [f'{cont}: ${val:,.0f}B' for cont, val in zip(df_plot['Continent'], df_plot['Total_GDP'])]
+    ax.legend(legend_labels, loc='upper center', bbox_to_anchor=(1.1, 1), fontsize=9, frameon=True)
 
 
-def line_plot(df, x_col, y_col, ax, region_name=""):
-    """
-    Create a line plot with filled area.
-
-    Args:
-        df: DataFrame with data to plot
-        x_col: Column name for x-axis
-        y_col: Column name for y-axis
-        ax: Matplotlib axis object
-        region_name: Name of region for title (optional)
-    """
-    sns.lineplot(
-        data=df, x=x_col, y=y_col,
-        color='#2a9d8f', linewidth=2.5, marker='o', markersize=6, ax=ax
-    )
-    ax.fill_between(df[x_col], df[y_col], color='#2a9d8f', alpha=0.1)
-
-    title = f'Annual GDP Growth Trend - {region_name}' if region_name else 'Annual GDP Growth Trend'
-    ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
-    ax.set_ylabel(y_col, fontweight='bold')
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
-    sns.despine(ax=ax, left=True)
-
-
-def scatter_plot(df, x_col, y_col, ax, region_name=""):
-    """
-    Create a scatter plot with regression line.
-
-    Args:
-        df: DataFrame with data to plot
-        x_col: Column name for x-axis
-        y_col: Column name for y-axis
-        ax: Matplotlib axis object
-        region_name: Name of region for title (optional)
-    """
-    sns.regplot(
-        data=df, x=x_col, y=y_col,
-        scatter_kws={'alpha': 0.4, 'color': '#e76f51', 's': 40},
-        line_kws={'color': '#264653', 'linewidth': 2},
-        ax=ax, ci=None
-    )
-    title = f'GDP Distribution & Regression - {region_name}' if region_name else 'GDP Distribution & Regression'
-    ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
-    ax.set_ylabel(y_col, fontweight='bold')
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
-    sns.despine(ax=ax, left=True)
-
-
-def show_dashboard(df_by_region, df_by_year, region_name="", year=None):
-    """
-    Create and display a comprehensive 2x2 dashboard with multiple charts.
-
-    Args:
-        df_by_region: DataFrame grouped by region
-        df_by_year: DataFrame grouped by year
-        region_name: Name of region for titles
-        year: Year for titles (optional)
-    """
-    fig, axes = plt.subplots(2, 2, figsize=(18, 12))
-    fig.suptitle("Comprehensive GDP Analysis Dashboard",
-                 fontsize=20, fontweight="bold")
-
-    line_plot(df_by_year, 'Year', 'GDP_Value',
-              axes[0, 0], region_name=region_name)
-
-    scatter_plot(df_by_year, 'Year', 'GDP_Value',
-                 axes[0, 1], region_name=region_name)
-
-    title_bar = f"Total GDP Contribution by Continent in {year}" if year else "Total GDP Contribution by Continent"
-    barplot(df_by_region, 'GDP_Value', 'Continent',
-            ax=axes[1, 0], title_prefix=title_bar)
-
-    title_donut = f"Total GDP Distribution by Continent in {year}" if year else "Total GDP Distribution by Continent"
-    donutplot(df_by_region, 'GDP_Value', 'Continent',
-              title=title_donut, ax=axes[1, 1])
-
-    # Adjust layout to prevent overlapping labels
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
