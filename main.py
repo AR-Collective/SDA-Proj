@@ -43,39 +43,47 @@ def bootstrap():
     """
     print_section("SDA PROJECT PHASE 2 - Modular Orchestration")
     config = load_config()
+    dic = {}
+    for column in config["schema_mapping"]["columns"]:
+        internal_name = column["internal_mapping"]
+        data_type = column["data_type"]
+        name = column["source_name"]
+        dic[internal_name] = {"source_name": name, "data_type": data_type} 
+    print(dic["entity_name"]["source_name"])
 
     # Early validation of config format and file accessibility
-    validate_and_print_config_format(config)
+    # validate_and_print_config_format(config)
 
-    output_format = config.get("output_format", "console").lower()
-    if output_format not in OUTPUT_DRIVERS:
-        print(f"✗ Unknown output format: {output_format}. Using 'console'")
-        output_format = "console"
-
-    sink = OUTPUT_DRIVERS[output_format]()
-    print(f"✓ Output writer instantiated: {output_format}")
-
-    engine = TransformationEngine(sink)
-    print("✓ Transformation engine created with injected sink")
-
-    input_format = config.get("input_format", "csv").lower()
-    filepath = config.get("filepath", "data/gdp_with_continent_filled.csv")
-
-    if input_format not in INPUT_DRIVERS:
-        print(f"✗ Unknown input format: {input_format}. Using 'csv'")
-        input_format = "csv"
-
-    print(f"✓ Input driver selected: {input_format}")
-    print(f"✓ Loading data from: {filepath}")
-
-    raw_data = INPUT_DRIVERS[input_format](filepath)
-    print(f"✓ Data loaded successfully ({len(raw_data)} rows)")
-
-    # Validate configuration against actual data
-    validate_and_print_config(raw_data, config)
-
-    engine.execute(raw_data, config)
-    print("✓ Pipeline execution completed successfully")
+    # output_format = config.get("output_format", "console").lower()
+    # if output_format not in OUTPUT_DRIVERS:
+    #     print(f"✗ Unknown output format: {output_format}. Using 'console'")
+    #     output_format = "console"
+    #
+    # sink = OUTPUT_DRIVERS[output_format]()
+    # print(f"✓ Output writer instantiated: {output_format}")
+    #
+    # engine = TransformationEngine(sink)
+    # print("✓ Transformation engine created with injected sink")
+    #
+    # input_format = config.get("input_format", "csv").lower()
+    # filepath = config.get("filepath", "data/gdp_with_continent_filled.csv")
+    #
+    # if input_format not in INPUT_DRIVERS:
+    #     print(f"✗ Unknown input format: {input_format}. Using 'csv'")
+    #     input_format = "csv"
+    #
+    # print(f"✓ Input driver selected: {input_format}")
+    # print(f"✓ Loading data from: {filepath}")
+    #
+    # raw_data = INPUT_DRIVERS[input_format](filepath)
+    # print(f"✓ Data loaded successfully ({len(raw_data)} rows)")
+    #
+    # # Validate configuration against actual data
+    # validate_and_print_config(raw_data, config)
+    #
+    # engine.execute(raw_data, config)
+    # print("✓ Pipeline execution completed successfully")
+    #
 
 
 if __name__ == "__main__":
