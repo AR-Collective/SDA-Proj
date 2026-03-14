@@ -287,8 +287,14 @@ class InputValidator:
 
         # Get required columns from schema
         schema = self.config["schema_mapping"]
+        columns = schema.get("columns", [])
+
+        # Skip if columns is not a list (error already caught in _validate_schema_mapping)
+        if not isinstance(columns, list):
+            return
+
         required_columns = {
-            col["source_name"] for col in schema.get("columns", [])
+            col["source_name"] for col in columns if isinstance(col, dict)
         }
 
         # Check all required columns exist in CSV
