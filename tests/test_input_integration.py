@@ -12,8 +12,8 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.schema_mapper import SchemaMapper
-from core.input_validator import InputValidator
+from plugins.inputs.schema_mapper import SchemaMapper
+from plugins.inputs.input_validator import InputValidator
 from plugins.inputs.generic_producer import GenericInputProducer
 
 

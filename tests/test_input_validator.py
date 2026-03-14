@@ -1,5 +1,5 @@
 """
-Unit tests for core/input_validator.py
+Unit tests for plugins/inputs/input_validator.py
 
 Tests configuration validation for the input module.
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.input_validator import InputValidator
+from plugins.inputs.input_validator import InputValidator
 
 
 class TestValidatorInit:

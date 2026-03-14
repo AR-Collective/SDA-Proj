@@ -1,5 +1,5 @@
 """
-Unit tests for core/schema_mapper.py
+Unit tests for plugins/inputs/schema_mapper.py
 
 Tests column name mapping and type casting functionality.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.schema_mapper import (
+from plugins.inputs.schema_mapper import (
     SchemaMapper, InvalidSchemaError, TypeCastError, ColumnMappingError
 )
 
