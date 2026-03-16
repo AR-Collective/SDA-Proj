@@ -322,35 +322,3 @@ class GenericInputProducer:
             return packets
 
 
-# Example usage (for testing)
-if __name__ == "__main__":
-    import json
-
-    # Load config
-    config_path = Path("config.json")
-    if not config_path.exists():
-        print("config.json not found")
-        sys.exit(1)
-
-    with open(config_path) as f:
-        config = json.load(f)
-
-    # Example: Test single batch processing
-    print("Testing GenericInputProducer with sample batch...\n")
-
-    try:
-        producer = GenericInputProducer(config, None)  # None queue for testing
-        packets = producer.run_single_batch(batch_size=5)
-
-        print("=" * 70)
-        print("SAMPLE PACKETS FROM CSV:")
-        print("=" * 70)
-        for i, packet in enumerate(packets, 1):  # YE i=1 se start krta
-            print(f"\nPacket {i}:")
-            for key, value in packet.items():
-                if not key.startswith("_"):
-                    print(f"  {key}: {value} ({type(value).__name__})")
-
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
