@@ -11,24 +11,28 @@ class Core:
         self.config = config
         return
     def process(self):
+
         queue = self.input_queue
         while True:
             packet = queue.get() 
+            # print(packet)
             if (not packet):
                 self.output_queue.put(packet)
                 return
             isPacketValid = self._validate(packet)
             if (isPacketValid):
-                self.output_queue.put(packet)
+                packet["isValid"] = True
             else:
-                print("Invalid Packet Recieved")
+                packet["isValid"] = False
+
+            self.output_queue.put(packet)
         return
     def _validate(self,packet):
         key = self.config['stateless_tasks']['secret_key']
         iterations = self.config['stateless_tasks']['iterations']
 
         hash_val = packet.get('security_hash')
-        raw_val = packet.get("metric_value")
+        raw_val = str(packet.get("metric_value"))
         return validate_signature(hash_val,raw_val,key,iterations)
 
 class Agregator:
@@ -44,21 +48,27 @@ class Agregator:
         while True:
             received_packet = self.queue.get()
             if (not received_packet):
+                # POISON PILL
+                self.output.put(None)
                 return
             while received_packet and received_packet["_id"] == self.expected_id:
                 avg = self._generate_output(received_packet)
-                self.output.put(avg)
+                if avg != "DONT":
+                    self.output.put(avg)
                 self.expected_id +=1
                 received_packet = None
                 if self.pq:
-                    received_packet = heapq.heappop(self.pq)
+                    pid, received_packet = heapq.heappop(self.pq)
             if (received_packet):
-                heapq.heappush(self.pq,received_packet)
+                heapq.heappush(self.pq,(received_packet["_id"],received_packet))
         return
     def _generate_output(self,packet):
-        self.deque.append(float(packet['metric_value']))
-        running_avg = sum(self.deque)/len(self.deque)
-        return running_avg
+        if (packet["isValid"]):
+            self.deque.append(float(packet['metric_value']))
+            running_avg = sum(self.deque)/len(self.deque)
+            return running_avg
+        else:
+            return "DONT"
 
 
 #

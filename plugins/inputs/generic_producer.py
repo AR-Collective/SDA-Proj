@@ -84,6 +84,7 @@ class GenericInputProducer:
         self.config = config
         self.queue1 = queue1
         self.shutdown_requested = False
+        self.next_id = 0
 
         # Validate config early
         validator = InputValidator(config)
@@ -174,8 +175,10 @@ class GenericInputProducer:
             packet = self.schema_mapper.process_row(raw_row)
 
             # Add metadata
-            packet["_source_row"] = row_number
-            packet["_producer_timestamp"] = time.time()
+            # packet["_source_row"] = row_number
+            # packet["_producer_timestamp"] = time.time()
+            packet["_id"] = self.next_id
+            self.next_id +=1
 
             return packet
 
@@ -202,6 +205,7 @@ class GenericInputProducer:
         Raises:
             ProducerError: If queue operation fails
         """
+
         try:
             # Put packet into queue (will block if queue is full - natural backpressure)
             if self.queue1 is None:
@@ -299,26 +303,40 @@ class GenericInputProducer:
         Returns:
             List of processed packets
         """
-        packets = []
+        # packets = []
 
         try:
             for raw_row in self._read_csv_rows():
-                if len(packets) >= batch_size:
-                    break
+                # if len(packets) >= batch_size:
+                #     break
 
-                row_number = len(packets) + 1
+                row_number = 1
                 packet = self._process_row(raw_row, row_number)
 
-                if packet is None:
-                    continue
+                # if packet is None:
+                #     continue
+                self.queue1.put(packet)
 
-                packets.append(packet)
 
-            logger.info(f"✓ Processed {len(packets)} packets")
-            return packets
+            # POISON PILL: ABHI KE LIYE TEMPORARY HALL
+
+            self.queue1.put(None)
+            self.queue1.put(None)
+            self.queue1.put(None)
+            self.queue1.put(None)
+            self.queue1.put(None)
+            self.queue1.put(None)
+            self.queue1.put(None)
+            self.queue1.put(None)
+            self.queue1.put(None)
+            self.queue1.put(None)
+            # packets.append(packet)
+
+            # logger.info(f"✓ Processed {len(packets)} packets")
+            # return packets
 
         except Exception as e:
             logger.error(f"Error in batch processing: {e}")
-            return packets
+            # return packets
 
 
