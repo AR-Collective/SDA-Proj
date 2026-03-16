@@ -66,7 +66,7 @@ def bootstrap():
     # print("✓ Transformation engine created with injected sink")
     #
     # input_format = config.get("input_format", "csv").lower()
-    # filepath = config.get("filepath", "data/gdp_with_continent_filled.csv")
+    filepath = config.get("dataset_path", "data/sample_sensor_data.csv")
     #
     # if input_format not in INPUT_DRIVERS:
     #     print(f"✗ Unknown input format: {input_format}. Using 'csv'")
@@ -75,7 +75,8 @@ def bootstrap():
     # print(f"✓ Input driver selected: {input_format}")
     # print(f"✓ Loading data from: {filepath}")
     #
-    # raw_data = INPUT_DRIVERS[input_format](filepath)
+    raw_data = INPUT_DRIVERS["csv"](filepath)
+    print(raw_data)
     # print(f"✓ Data loaded successfully ({len(raw_data)} rows)")
     #
     # # Validate configuration against actual data
