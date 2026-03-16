@@ -317,19 +317,6 @@ class GenericInputProducer:
                 #     continue
                 self.queue1.put(packet)
 
-
-            # POISON PILL: ABHI KE LIYE TEMPORARY HALL
-
-            self.queue1.put(None)
-            self.queue1.put(None)
-            self.queue1.put(None)
-            self.queue1.put(None)
-            self.queue1.put(None)
-            self.queue1.put(None)
-            self.queue1.put(None)
-            self.queue1.put(None)
-            self.queue1.put(None)
-            self.queue1.put(None)
             # packets.append(packet)
 
             # logger.info(f"✓ Processed {len(packets)} packets")

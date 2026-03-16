@@ -14,14 +14,17 @@ class Core:
         queue = self.input_queue
         while True:
             packet = queue.get() 
-            if (not packet):
-                self.output_queue.put(packet)
+            if packet is None:
                 return
+
             isPacketValid = self._validate(packet)
             if (isPacketValid):
                 packet["isValid"] = True
             else:
-                packet["isValid"] = False
+                packet = {
+                    "_id":packet["_id"],
+                    "isValid": False
+                }
 
             self.output_queue.put(packet)
         return
