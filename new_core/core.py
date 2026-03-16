@@ -11,11 +11,9 @@ class Core:
         self.config = config
         return
     def process(self):
-
         queue = self.input_queue
         while True:
             packet = queue.get() 
-            # print(packet)
             if (not packet):
                 self.output_queue.put(packet)
                 return
@@ -43,56 +41,24 @@ class Agregator:
         self.deque = deque(maxlen=maxLen)
         self.output = output_queue
         return
-    # TODO: expected id 
     def agregate(self):
         while True:
             received_packet = self.queue.get()
-            if (not received_packet):
+            if received_packet is None:
                 # POISON PILL
                 self.output.put(None)
                 return
-            while received_packet and received_packet["_id"] == self.expected_id:
-                avg = self._generate_output(received_packet)
-                if avg != "DONT":
+
+            heapq.heappush(self.pq,(received_packet["_id"],received_packet))
+            while self.pq and self.pq[0][0] == self.expected_id:
+                _, packet_to_process = heapq.heappop(self.pq)
+                avg = self._generate_output(packet_to_process)
+                if avg is not None:
                     self.output.put(avg)
                 self.expected_id +=1
-                received_packet = None
-                if self.pq:
-                    pid, received_packet = heapq.heappop(self.pq)
-            if (received_packet):
-                heapq.heappush(self.pq,(received_packet["_id"],received_packet))
-        return
+
     def _generate_output(self,packet):
         if (packet["isValid"]):
             self.deque.append(float(packet['metric_value']))
             running_avg = sum(self.deque)/len(self.deque)
             return running_avg
-        else:
-            return "DONT"
-
-
-#
-# OUTPUT
-# if __name__ == "__main__":
-#     packet = {
-#         "_id": 0,
-#         "entity_name": "Sensor_Alpha",
-#         "time_period": "1773037634",
-#         "metric_value": "23.81",
-#         "security_hash": "6fffc630960e0661f40d2c57ee51271a55f024161d76f574da49674bd1a3af88",
-#     }
-#     input_queue = mp.Queue()
-#     input_queue.put(packet)
-#     input_queue.put(None)
-#
-#     output_queue = mp.Queue()
-#     config = json.loads(json_string)
-#     core = Core(input_queue, output_queue,config)
-#     core.process()
-#     final_out = mp.Queue()
-#     a = Agregator(output_queue,final_out,50) 
-#     a.agregate()
-#     print("HERE")
-#     get_result = final_out.get()
-#     print(get_result)
-
