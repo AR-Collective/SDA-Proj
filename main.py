@@ -50,8 +50,6 @@ def bootstrap():
 
     print("Testing GenericInputProducer with sample batch...\n")
 
-    # try:
-
     processes=[]
     queue_size = config["pipeline_dynamics"]["stream_queue_max_size"]
     workers = config["pipeline_dynamics"]["core_parallelism"]
@@ -62,15 +60,11 @@ def bootstrap():
     producer = GenericInputProducer(config, input_queue)  # None queue for testing
     p=mp.Process(target=producer.run_single_batch, kwargs={"batch_size": 5})
     p.start()
-    # packets=producer.run_single_batch(batch_size=5)  # abhi sirf testing ke liye
     initialize_multiprocessing(processes,input_queue,agregator_queue,workers, config["processing"])
 
     agg=Agregator(agregator_queue,output_queue,50) 
     a = mp.Process(target=agg.agregate)
     a.start()
-    #     print("HERE")
-    #     get_result = final_out.get()
-    #     print(get_result)
 
     while True:
         get = output_queue.get()
@@ -83,53 +77,10 @@ def bootstrap():
     for p in processes:
         p.join()
     a.join()
-    # print("=" * 70)
-    # print("SAMPLE PACKETS FROM CSV:")
-    # print("=" * 70)
-    # for i, packet in enumerate(packets, 1):
-    #     print(f"\nPacket {i}:")
-    #     for key, value in packet.items():
-    #         if not key.startswith("_"):
-    #             print(f"  {key}: {value} ({type(value).__name__})")
-
-
-    # except Exception as e:
-    #     print(f"Error: {e}")
-    #     sys.exit(1)
 
 
 if __name__ == "__main__":
     bootstrap()
-
-
-
-
-
-
-
-    # if __name__ == "__main__":
-    #     packet = {
-    #         "_id": 0,
-    #         "entity_name": "Sensor_Alpha",
-    #         "time_period": "1773037634",
-    #         "metric_value": "23.81",
-    #         "security_hash": "6fffc630960e0661f40d2c57ee51271a55f024161d76f574da49674bd1a3af88",
-    #     }
-    #     input_queue = mp.Queue()
-    #     input_queue.put(packet)
-    #     input_queue.put(None)
-    #
-    #     output_queue = mp.Queue()
-    #     config = json.loads(json_string)
-    #     core = Core(input_queue, output_queue,config)
-    #     core.process()
-    #     final_out = mp.Queue()
-    #     a = Agregator(output_queue,final_out,50) 
-    #     a.agregate()
-    #     print("HERE")
-    #     get_result = final_out.get()
-    #     print(get_result)
-
 
     # OLD CODE
 
