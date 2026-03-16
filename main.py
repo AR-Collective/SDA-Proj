@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 import traceback
 import sys
+import threading
 
 # INPUT_DRIVERS = {"json": JsonReader, "csv": CsvReader}
 # OUTPUT_DRIVERS = {"console": ConsoleWriter, "graphics": GraphicsChartWriter}
@@ -38,6 +39,20 @@ def initialize_multiprocessing(processes,input_queue, agregator_queue,workers, c
 
 
 
+def shutdown_everything(input_producer, processes, input_queue, agg_process,agregator_queue):
+    input_producer.join()
+
+    for i in range(len(processes)):
+        input_queue.put(None)
+
+    agregator_queue.put(None)
+
+    for worker in processes:
+        worker.join()
+
+    agg_process.join()
+    return
+
 def bootstrap():
     # Load config
     config_path = Path("config.json")
@@ -52,31 +67,30 @@ def bootstrap():
 
     processes=[]
     queue_size = config["pipeline_dynamics"]["stream_queue_max_size"]
-    workers = config["pipeline_dynamics"]["core_parallelism"]
+    # workers = config["pipeline_dynamics"]["core_parallelism"]
+    workers = 1
     input_queue = mp.Queue(maxsize=queue_size)
     agregator_queue = mp.Queue(maxsize=queue_size)
     output_queue = mp.Queue(maxsize=queue_size)
 
     producer = GenericInputProducer(config, input_queue)  # None queue for testing
-    p=mp.Process(target=producer.run_single_batch, kwargs={"batch_size": 5})
-    p.start()
+    input_producer=mp.Process(target=producer.run_single_batch, kwargs={"batch_size": 5})
+    input_producer.start()
     initialize_multiprocessing(processes,input_queue,agregator_queue,workers, config["processing"])
 
-    agg=Agregator(agregator_queue,output_queue,50) 
-    a = mp.Process(target=agg.agregate)
-    a.start()
+    agg=Agregator(agregator_queue,output_queue,queue_size) 
+    agg_process = mp.Process(target=agg.agregate)
+    agg_process.start()
 
+    shutdown_manager = threading.Thread(target=shutdown_everything, args=(input_producer,processes,input_queue,agg_process,agregator_queue))
+    shutdown_manager.start()
     while True:
         get = output_queue.get()
-        if not get:
-            return
+        if get is None:
+            break
         print(get)
+    shutdown_manager.join()
 
-    p.join()
-
-    for p in processes:
-        p.join()
-    a.join()
 
 
 if __name__ == "__main__":

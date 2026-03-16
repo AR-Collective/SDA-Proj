@@ -15,8 +15,6 @@ class Core:
         while True:
             packet = queue.get() 
             if packet is None:
-                # SEND EXIT REQ
-                self.output_queue.put(packet)
                 return
 
             isPacketValid = self._validate(packet)
