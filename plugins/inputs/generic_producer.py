@@ -22,6 +22,8 @@ Example:
     producer_process.start()
 """
 
+from .input_validator import InputValidator
+from .schema_mapper import SchemaMapper, SchemaMapperError
 import csv as csv_module
 import time
 import sys
@@ -34,8 +36,6 @@ import logging
 # Add project root to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from .schema_mapper import SchemaMapper, SchemaMapperError
-from .input_validator import InputValidator
 
 
 # Setup logging
@@ -345,7 +345,7 @@ if __name__ == "__main__":
         print("=" * 70)
         print("SAMPLE PACKETS FROM CSV:")
         print("=" * 70)
-        for i, packet in enumerate(packets, 1):
+        for i, packet in enumerate(packets, 1):  # YE i=1 se start krta
             print(f"\nPacket {i}:")
             for key, value in packet.items():
                 if not key.startswith("_"):
