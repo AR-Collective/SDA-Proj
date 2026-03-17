@@ -175,8 +175,8 @@ class GenericInputProducer:
             packet = self.schema_mapper.process_row(raw_row)
 
             # Add metadata
-            # packet["_source_row"] = row_number
-            # packet["_producer_timestamp"] = time.time()
+            packet["_source_row"] = row_number
+            packet["_producer_timestamp"] = time.time()
             packet["_id"] = self.next_id
             self.next_id +=1
 
@@ -297,33 +297,40 @@ class GenericInputProducer:
         """
         Process a single batch of rows (useful for testing).
 
+        Can work in two modes:
+        - Test mode (queue1=None): Returns list of packets
+        - Production mode (queue1 provided): Queues packets AND returns them
+
         Args:
             batch_size: Number of rows to process before returning
 
         Returns:
             List of processed packets
         """
-        # packets = []
+        packets = []
 
         try:
             for raw_row in self._read_csv_rows():
-                # if len(packets) >= batch_size:
-                #     break
+                if len(packets) >= batch_size:
+                    break
 
                 row_number = 1
                 packet = self._process_row(raw_row, row_number)
 
-                # if packet is None:
-                #     continue
-                self.queue1.put(packet)
+                if packet is None:
+                    continue
 
-            # packets.append(packet)
+                packets.append(packet)
 
-            # logger.info(f"✓ Processed {len(packets)} packets")
-            # return packets
+                # Queue the packet if queue is available (production mode)
+                if self.queue1 is not None:
+                    self.queue1.put(packet)
+
+            logger.info(f"✓ Processed {len(packets)} packets")
+            return packets
 
         except Exception as e:
             logger.error(f"Error in batch processing: {e}")
-            # return packets
+            return packets
 
 
