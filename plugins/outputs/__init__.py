@@ -1,11 +1,21 @@
 """
-Output Plugins Module
+Phase 3 Output Module
 
-Provides output drivers for writing analysis results in various formats.
-Each driver implements the DataSink protocol from core/contracts.py
+Provides real-time output consumers that display processed results:
+- ConsoleConsumer: Real-time console output with statistics
+- GUIConsumer: Matplotlib dashboard with live graphs
+
+Both consumers run as independent processes, reading from output_queue
+and displaying running averages as they arrive.
 """
 
-from .console_writer import ConsoleWriter
-from .graphics_writer import GraphicsChartWriter
+from .base_consumer import BaseOutputConsumer, OutputConsumerError
+from .console_consumer import ConsoleConsumer
+from .gui_dashboard import GUIConsumer
 
-__all__ = ['ConsoleWriter', 'GraphicsChartWriter']
+__all__ = [
+    'BaseOutputConsumer',
+    'OutputConsumerError',
+    'ConsoleConsumer',
+    'GUIConsumer',
+]

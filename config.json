@@ -8,23 +8,23 @@
   "schema_mapping": {
     "columns": [
       {
-        "source_name": "Sensor_ID", 
-        "internal_mapping": "entity_name", 
+        "source_name": "Sensor_ID",
+        "internal_mapping": "entity_name",
         "data_type": "string"
       },
       {
-        "source_name": "Timestamp", 
-        "internal_mapping": "time_period", 
+        "source_name": "Timestamp",
+        "internal_mapping": "time_period",
         "data_type": "integer"
       },
       {
-        "source_name": "Raw_Value", 
-        "internal_mapping": "metric_value", 
+        "source_name": "Raw_Value",
+        "internal_mapping": "metric_value",
         "data_type": "float"
       },
       {
-        "source_name": "Auth_Signature", 
-        "internal_mapping": "security_hash", 
+        "source_name": "Auth_Signature",
+        "internal_mapping": "security_hash",
         "data_type": "string"
       }
     ]
