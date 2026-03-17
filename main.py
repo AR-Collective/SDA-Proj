@@ -85,7 +85,7 @@ def bootstrap():
     # Start input producer
     print("Starting Input Producer...")
     producer = GenericInputProducer(config, input_queue)
-    input_producer = mp.Process(target=producer.run_single_batch, kwargs={"batch_size": 5})
+    input_producer = mp.Process(target=producer.run)
     input_producer.start()
 
     # Start core workers
@@ -99,7 +99,17 @@ def bootstrap():
     agg_process.start()
 
     # Start output consumers
-    print("Starting Output Consumers (Console + GUI)...")
+    print("Starting Output Consumers...\n")
+
+    # ============================================================
+    # OUTPUT CONSUMER SELECTION
+    # ============================================================
+    # Uncomment ONE of the two sections below to choose which
+    # output consumer to use:
+    #
+    # Option 1: CONSOLE OUTPUT
+    # Uncomment the section below to see real-time console output
+    # ============================================================
 
     # Console consumer
     try:
@@ -107,21 +117,29 @@ def bootstrap():
         console_process = mp.Process(target=console_consumer.consume)
         console_process.start()
         output_processes.append(console_process)
-        print("  ✓ Console consumer started")
+        print("  ✓ Console consumer started\n")
     except Exception as e:
-        print(f"  ✗ Failed to start console consumer: {e}")
+        print(f"  ✗ Failed to start console consumer: {e}\n")
 
-    # GUI consumer (optional if matplotlib available)
-    try:
-        gui_consumer = GUIConsumer(output_queue)
-        gui_process = mp.Process(target=gui_consumer.consume)
-        gui_process.start()
-        output_processes.append(gui_process)
-        print("  ✓ GUI consumer started")
-    except ImportError:
-        print("  ⚠ GUI consumer skipped (matplotlib not available)")
-    except Exception as e:
-        print(f"  ✗ Failed to start GUI consumer: {e}")
+    # ============================================================
+    # Option 2: GUI DASHBOARD (Requires matplotlib)
+    # Comment out the Console consumer above and uncomment this
+    # section to see live graph and statistics panel
+    # ============================================================
+
+    # # GUI consumer
+    # try:
+    #     gui_consumer = GUIConsumer(output_queue)
+    #     gui_process = mp.Process(target=gui_consumer.consume)
+    #     gui_process.start()
+    #     output_processes.append(gui_process)
+    #     print("  ✓ GUI consumer started\n")
+    # except ImportError:
+    #     print("  ⚠ GUI consumer skipped (matplotlib not available)\n")
+    # except Exception as e:
+    #     print(f"  ✗ Failed to start GUI consumer: {e}\n")
+
+    # ============================================================
 
     # Setup graceful shutdown handler
     def on_all_done():

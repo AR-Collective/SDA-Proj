@@ -60,7 +60,7 @@ class GUIConsumer(BaseOutputConsumer):
         self.fig, (self.ax_graph, self.ax_stats) = plt.subplots(
             1, 2,
             figsize=(14, 5),
-            fignum="Real-time Output Dashboard"
+            num="Real-time Output Dashboard"
         )
 
         # Configure graph subplot
