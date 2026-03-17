@@ -1,22 +1,16 @@
 """
-SDA Project Phase 2 - Modular Orchestration & Dependency Inversion
+SDA Project Phase 3 - Complete Pipeline with Input, Core, Output
 """
 
-
-# from plugins.inputs import JsonReader, CsvReader, load_config
-# from plugins.outputs import ConsoleWriter, GraphicsChartWriter
-# from core.engine import TransformationEngine
-# from core.validator import validate_and_print_config, validate_and_print_config_format
-
 from plugins.inputs.generic_producer import GenericInputProducer
-from new_core.core import Core,Agregator
-import time
+from plugins.outputs import ConsoleConsumer, GUIConsumer
+from new_core.core import Core, Agregator
 import multiprocessing as mp
 import json
 from pathlib import Path
-import traceback
 import sys
 import threading
+import logging
 
 # INPUT_DRIVERS = {"json": JsonReader, "csv": CsvReader}
 # OUTPUT_DRIVERS = {"console": ConsoleWriter, "graphics": GraphicsChartWriter}
@@ -39,7 +33,8 @@ def initialize_multiprocessing(processes,input_queue, agregator_queue,workers, c
 
 
 
-def shutdown_everything(input_producer, processes, input_queue, agg_process,agregator_queue):
+def shutdown_everything(input_producer, processes, input_queue, agg_process, agregator_queue, output_processes, output_queue):
+    """Gracefully shutdown all pipeline processes."""
     input_producer.join()
 
     for i in range(len(processes)):
@@ -51,9 +46,18 @@ def shutdown_everything(input_producer, processes, input_queue, agg_process,agre
         worker.join()
 
     agg_process.join()
+
+    # Signal output consumers to shutdown
+    output_queue.put(None)
+
+    # Wait for output consumers
+    for proc in output_processes:
+        proc.join()
+
     return
 
 def bootstrap():
+    """Bootstrap the complete Phase 3 pipeline."""
     # Load config
     config_path = Path("config.json")
     if not config_path.exists():
@@ -63,33 +67,77 @@ def bootstrap():
     with open(config_path) as f:
         config = json.load(f)
 
-    print("Testing GenericInputProducer with sample batch...\n")
+    print("\n" + "=" * 70)
+    print("  SDA PROJECT PHASE 3 - COMPLETE PIPELINE")
+    print("=" * 70)
+    print("  Input → Core Workers → Aggregator → Output Consumers\n")
 
-    processes=[]
+    # Initialize queues and processes
+    processes = []
+    output_processes = []
     queue_size = config["pipeline_dynamics"]["stream_queue_max_size"]
-    # workers = config["pipeline_dynamics"]["core_parallelism"]
-    workers = 1
+    workers = 1  # Using single worker for demo (can be increased)
+
     input_queue = mp.Queue(maxsize=queue_size)
     agregator_queue = mp.Queue(maxsize=queue_size)
     output_queue = mp.Queue(maxsize=queue_size)
 
-    producer = GenericInputProducer(config, input_queue)  # None queue for testing
-    input_producer=mp.Process(target=producer.run_single_batch, kwargs={"batch_size": 5})
+    # Start input producer
+    print("Starting Input Producer...")
+    producer = GenericInputProducer(config, input_queue)
+    input_producer = mp.Process(target=producer.run_single_batch, kwargs={"batch_size": 5})
     input_producer.start()
-    initialize_multiprocessing(processes,input_queue,agregator_queue,workers, config["processing"])
 
-    agg=Agregator(agregator_queue,output_queue,queue_size) 
+    # Start core workers
+    print("Starting Core Workers...")
+    initialize_multiprocessing(processes, input_queue, agregator_queue, workers, config["processing"])
+
+    # Start aggregator
+    print("Starting Aggregator...")
+    agg = Agregator(agregator_queue, output_queue, queue_size)
     agg_process = mp.Process(target=agg.agregate)
     agg_process.start()
 
-    shutdown_manager = threading.Thread(target=shutdown_everything, args=(input_producer,processes,input_queue,agg_process,agregator_queue))
+    # Start output consumers
+    print("Starting Output Consumers (Console + GUI)...")
+
+    # Console consumer
+    try:
+        console_consumer = ConsoleConsumer(output_queue)
+        console_process = mp.Process(target=console_consumer.consume)
+        console_process.start()
+        output_processes.append(console_process)
+        print("  ✓ Console consumer started")
+    except Exception as e:
+        print(f"  ✗ Failed to start console consumer: {e}")
+
+    # GUI consumer (optional if matplotlib available)
+    try:
+        gui_consumer = GUIConsumer(output_queue)
+        gui_process = mp.Process(target=gui_consumer.consume)
+        gui_process.start()
+        output_processes.append(gui_process)
+        print("  ✓ GUI consumer started")
+    except ImportError:
+        print("  ⚠ GUI consumer skipped (matplotlib not available)")
+    except Exception as e:
+        print(f"  ✗ Failed to start GUI consumer: {e}")
+
+    # Setup graceful shutdown handler
+    def on_all_done():
+        """Called when all output is complete."""
+        shutdown_everything(input_producer, processes, input_queue, agg_process, agregator_queue, output_processes, output_queue)
+
+    shutdown_manager = threading.Thread(target=on_all_done)
+    shutdown_manager.daemon = True
     shutdown_manager.start()
-    while True:
-        get = output_queue.get()
-        if get is None:
-            break
-        print(get)
+
+    # Wait for shutdown manager to complete
     shutdown_manager.join()
+
+    print("\n" + "=" * 70)
+    print("  Pipeline Complete")
+    print("=" * 70 + "\n")
 
 
 
