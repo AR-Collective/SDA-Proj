@@ -15,12 +15,15 @@ class Core:
         while True:
             packet = queue.get() 
             if packet is None:
+                # Agle process ke liye EOF behj do
+                queue.put(None)
                 return
 
             isPacketValid = self._validate(packet)
             if (isPacketValid):
                 packet["isValid"] = True
             else:
+                # ye issliye taake bara package na jaaye, aur thora kaam optimize ho jaaye
                 packet = {
                     "_id":packet["_id"],
                     "isValid": False

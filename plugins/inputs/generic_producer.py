@@ -32,10 +32,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Generator
 from multiprocessing import Queue
 import logging
-
-# Add project root to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
+import traceback
 
 
 # Setup logging
@@ -64,13 +61,13 @@ class GenericInputProducer:
     - Gracefully shuts down on signal
 
     Attributes:
-        config: Full config.json dict
+        config: schema_config only
         queue1: multiprocessing.Queue to put packets into
         schema_mapper: SchemaMapper instance for column mapping
         shutdown_requested: Flag to check for graceful shutdown
     """
 
-    def __init__(self, config: Dict[str, Any], queue1: Queue):
+    def __init__(self, queue1: Queue, schema_mapping: Dict[str, Any], input_delay: int):
         """
         Initialize the input producer.
 
@@ -81,36 +78,22 @@ class GenericInputProducer:
         Raises:
             ProducerError: If config is invalid
         """
-        self.config = config
-        self.queue1 = queue1
+        self.config = schema_mapping
+        self.input_queue = queue1
         self.shutdown_requested = False
         self.next_id = 0
-
-        # Validate config early
-        validator = InputValidator(config)
-        is_valid, message = validator.validate_all()
-        if not is_valid:
-            logger.error(f"Config validation failed:\n{message}")
-            raise ProducerError(f"Invalid config: {message}")
-
-        logger.info(f"✓ Config validation passed")
+        self.input_delay = input_delay
 
         # Initialize schema mapper
         try:
-            self.schema_mapper = SchemaMapper(config["schema_mapping"])
+            self.schema_mapper = SchemaMapper(schema_mapping)
             logger.info(f"✓ Schema mapper initialized with {len(self.schema_mapper.columns)} columns")
         except Exception as e:
             logger.error(f"Failed to initialize schema mapper: {e}")
             raise ProducerError(f"Schema mapper error: {e}")
 
-        # Extract pipeline config
-        self.dataset_path = config["dataset_path"]
-        self.input_delay_seconds = config["pipeline_dynamics"]["input_delay_seconds"]
-        self.queue_max_size = config["pipeline_dynamics"]["stream_queue_max_size"]
 
-        logger.info(f"Dataset: {self.dataset_path}")
-        logger.info(f"Input delay: {self.input_delay_seconds}s")
-        logger.info(f"Queue max size: {self.queue_max_size}")
+        logger.info(f"Input delay: {self.input_delay}s")
 
     def _setup_signal_handlers(self) -> None:
         """Setup handlers for graceful shutdown on Ctrl+C."""
@@ -121,7 +104,7 @@ class GenericInputProducer:
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
-    def _read_csv_rows(self) -> Generator[Dict[str, Any], None, None]:
+    def _read_csv_rows(self, dataset_path:str) -> Generator[Dict[str, Any], None, None]:
         """
         Read CSV file row by row (streaming).
 
@@ -131,7 +114,7 @@ class GenericInputProducer:
         Raises:
             ProducerError: If CSV cannot be read
         """
-        path = Path(self.dataset_path)
+        path = Path(dataset_path)
 
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -143,29 +126,26 @@ class GenericInputProducer:
                 # Log CSV structure
                 logger.info(f"✓ CSV opened, columns: {reader.fieldnames}")
 
-                row_number = 0
                 for row in reader:
                     if self.shutdown_requested:
-                        logger.info(f"Shutdown requested after {row_number} rows")
+                        logger.info(f"Shutdown requested")
                         return
 
-                    row_number += 1
                     yield row
 
-                logger.info(f"✓ Finished reading {row_number} rows from CSV")
+                logger.info(f"✓ Finished reading from CSV")
 
         except FileNotFoundError:
             raise ProducerError(f"Dataset file not found: {path}")
         except Exception as e:
             raise ProducerError(f"Error reading CSV: {e}")
 
-    def _process_row(self, raw_row: Dict[str, Any], row_number: int) -> Optional[Dict[str, Any]]:
+    def _process_row(self, raw_row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Process a single row: map columns and cast types.
 
         Args:
             raw_row: Row from CSV (all values are strings)
-            row_number: Row number in CSV (for logging)
 
         Returns:
             Processed packet (or None if error)
@@ -175,32 +155,29 @@ class GenericInputProducer:
             packet = self.schema_mapper.process_row(raw_row)
 
             # Add metadata
-            packet["_source_row"] = row_number
-            packet["_producer_timestamp"] = time.time()
             packet["_id"] = self.next_id
             self.next_id +=1
 
             return packet
 
         except SchemaMapperError as e:
-            logger.warning(f"Row {row_number}: Failed to process - {e}")
+            logger.warning(f"Failed to process - {e}")
             return None
         except Exception as e:
-            logger.warning(f"Row {row_number}: Unexpected error - {e}")
+            logger.warning(f"Unexpected error - {e}")
             return None
 
     def _apply_throttle(self) -> None:
         """Apply input delay throttling."""
-        if self.input_delay_seconds > 0:
-            time.sleep(self.input_delay_seconds)
+        if self.input_delay > 0:
+            time.sleep(self.input_delay)
 
-    def _queue_packet(self, packet: Dict[str, Any], row_number: int) -> None:
+    def _queue_packet(self, packet: Dict[str, Any]) -> None:
         """
         Put packet into Queue1 with error handling.
 
         Args:
             packet: Processed row data
-            row_number: Row number (for logging)
 
         Raises:
             ProducerError: If queue operation fails
@@ -208,22 +185,20 @@ class GenericInputProducer:
 
         try:
             # Put packet into queue (will block if queue is full - natural backpressure)
-            if self.queue1 is None:
+            if self.input_queue is None:
                 raise ProducerError("Queue1 is None - not initialized")
 
-            self.queue1.put(packet, timeout=30)
-            logger.debug(f"Row {row_number}: Successfully queued packet")
+            self.input_queue.put(packet, timeout=30)
+            logger.debug(f"Row Successfully queued packet")
 
         except Exception as e:
-            import traceback
             error_trace = traceback.format_exc()
-            logger.error(f"Row {row_number}: Failed to queue packet")
             logger.error(f"Exception type: {type(e).__name__}")
             logger.error(f"Exception message: {str(e)}")
             logger.error(f"Traceback:\n{error_trace}")
             raise ProducerError(f"Queue error: {str(e)}")
 
-    def run(self) -> None:
+    def run(self, dataset_path) -> None:
         """
         Main producer loop.
 
@@ -244,15 +219,14 @@ class GenericInputProducer:
 
         try:
             # Read CSV and process each row
-            for raw_row in self._read_csv_rows():
+            for raw_row in self._read_csv_rows(dataset_path):
                 if self.shutdown_requested:
                     logger.info("Shutdown requested, exiting main loop")
                     break
 
-                row_number = packets_queued + packets_skipped + 1
 
                 # Process the row
-                packet = self._process_row(raw_row, row_number)
+                packet = self._process_row(raw_row)
 
                 if packet is None:
                     packets_skipped += 1
@@ -263,15 +237,15 @@ class GenericInputProducer:
 
                 # Queue the packet (may block if queue is full)
                 try:
-                    self._queue_packet(packet, row_number)
+                    self._queue_packet(packet)
                     packets_queued += 1
                 except ProducerError:
-                    logger.error(f"Failed to queue row {row_number}, stopping producer")
+                    logger.error(f"Failed to queue row stopping producer")
                     break
 
             # Signal end-of-stream to core workers
             logger.info(f"Sending end-of-stream sentinel to queue...")
-            self.queue1.put(None, timeout=10)  # None = EOF marker
+            self.input_queue.put(None, timeout=10)  # None = EOF marker
             logger.info(f"✓ End-of-stream sentinel sent")
 
         except KeyboardInterrupt:
@@ -280,7 +254,7 @@ class GenericInputProducer:
             logger.error(f"Producer error: {e}")
             # Send EOF marker even on error
             try:
-                self.queue1.put(None, timeout=5)
+                self.input_queue.put(None, timeout=5)
             except:
                 pass
             raise
@@ -292,45 +266,4 @@ class GenericInputProducer:
             logger.info(f"  Packets skipped (errors): {packets_skipped}")
             logger.info(f"  Total rows processed: {packets_queued + packets_skipped}")
             logger.info("=" * 70)
-
-    def run_single_batch(self, batch_size: int = 10) -> list:
-        """
-        Process a single batch of rows (useful for testing).
-
-        Can work in two modes:
-        - Test mode (queue1=None): Returns list of packets
-        - Production mode (queue1 provided): Queues packets AND returns them
-
-        Args:
-            batch_size: Number of rows to process before returning
-
-        Returns:
-            List of processed packets
-        """
-        packets = []
-
-        try:
-            for raw_row in self._read_csv_rows():
-                if len(packets) >= batch_size:
-                    break
-
-                row_number = 1
-                packet = self._process_row(raw_row, row_number)
-
-                if packet is None:
-                    continue
-
-                packets.append(packet)
-
-                # Queue the packet if queue is available (production mode)
-                if self.queue1 is not None:
-                    self.queue1.put(packet)
-
-            logger.info(f"✓ Processed {len(packets)} packets")
-            return packets
-
-        except Exception as e:
-            logger.error(f"Error in batch processing: {e}")
-            return packets
-
 
