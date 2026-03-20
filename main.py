@@ -5,7 +5,8 @@ SDA Project Phase 3 - Complete Pipeline with Input, Core, Output
 from plugins.inputs.generic_producer import GenericInputProducer
 from plugins.inputs.input_validator import InputValidator
 from plugins.outputs import ConsoleConsumer, GUIConsumer
-from core.core import Core, Agregator
+from core import CoreLogic, Agregator
+from core import CoreManager
 import multiprocessing as mp
 import json
 from pathlib import Path
@@ -13,34 +14,124 @@ import sys
 import threading
 import logging
 
+class Pipeline:
+    def __init__(self,config):
+        self.config = config
+    def validate_config(self):
+        validator = InputValidator(self.config)
+        is_valid, message = validator.validate_all()
+        if not is_valid:
+            logger.error(f"Config validation failed:\n{message}")
+            raise ProducerError(f"Invalid config: {message}")
+
+        print(f"* Config validation passed")
+        return True
+
+    def bootstrap(self):
+        self.validate_config()
+        self.queue_size = self.config["pipeline_dynamics"]["stream_queue_max_size"]
+        self.workers = self.config["pipeline_dynamics"]["core_parallelism"] 
+
+        self.init_queues()
+        self.run_input()
+        self.run_core()
+        # start aggregate process
+        self.run_agregate()
+
+        self.run_output()
+
+        self.shutdown_all()
 
 
-def initialize_multiprocessing(processes,input_queue, agregator_queue,workers, core_config):
-
-    for _ in range(workers):
-        core = Core(input_queue, agregator_queue,core_config)
-        p=mp.Process(target=core.process)
-        p.start()
-        processes.append(p)
+        # # Start output consumers
+        # print("Starting Output Consumers...\n")
 
 
+        # Setup graceful shutdown handler
 
-def shutdown_everything(input_producer, processes, input_queue, agg_process, agregator_queue, output_processes, output_queue):
+
+    def init_queues(self):
+        self.input_queue = mp.Queue(maxsize=self.queue_size)
+        self.agregator_queue = mp.Queue(maxsize=self.queue_size)
+        self.output_queue = mp.Queue(maxsize=self.queue_size)
+
+    def run_input(self):
+
+        # Start input producer
+        print("Starting Input Producer...")
+        input_delay = self.config["pipeline_dynamics"]["input_delay_seconds"]
+        producer = GenericInputProducer(self.input_queue,self.config["schema_mapping"], input_delay)
+        self.input_producer = mp.Process(target=producer.run, args=(self.config["dataset_path"],))
+        self.input_producer.start()
+        return
+    def shutdown_input(self):
+        self.input_producer.join()
+        return
+    def run_core(self):
+        # Start core workers
+        print("Starting Core Workers...")
+        self.core = CoreManager(self.input_queue, self.agregator_queue, self.workers, self.config["processing"])
+        self.core.initialize_multiprocessing()
+        return
+    def shutdown_core(self):
+        self.core.shutdown_core()
+        return
+    def run_agregate(self):
+        # Start aggregator
+        print("Starting Aggregator...")
+        agg = Agregator(self.agregator_queue, self.output_queue, self.queue_size)
+        self.agg_process = mp.Process(target=agg.agregate)
+        self.agg_process.start()
+        return
+    def shutdown_agregate(self):
+        self.agregator_queue.put(None)
+        self.agg_process.join()
+
+    def shutdown_all(self):
+        def shutdown(self):
+            self.shutdown_input()
+            self.shutdown_core()
+            self.shutdown_agregate()
+            self.shutdown_output()
+            return
+        shutdown_manager = threading.Thread(target=shutdown, args=(self,))
+        shutdown_manager.daemon = True
+        shutdown_manager.start()
+
+        shutdown_manager.join()
+
+    def run_output(self):
+
+        self.output_processes = []
+        # Initialize queues and processes
+
+        # ============================================================
+        # OUTPUT CONSUMER SELECTION
+        # ============================================================
+        # Uncomment ONE of the two sections below to choose which
+        # output consumer to use:
+        #
+        # Console consumer
+        try:
+            console_consumer = ConsoleConsumer(self.output_queue)
+            console_process = mp.Process(target=console_consumer.consume)
+            console_process.start()
+            self.output_processes.append(console_process)
+            print("  ✓ Console consumer started\n")
+        except Exception as e:
+            print(f"  ✗ Failed to start console consumer: {e}\n")
+        return
+    def shutdown_output(self):
+        # Signal output consumers to shutdown
+        self.output_queue.put(None)
+
+        # Wait for output consumers
+        for proc in self.output_processes:
+            proc.join()
+        return 
+
+def shutdown_everything(input_producer, core, input_queue, agg_process, agregator_queue, output_processes, output_queue):
     """Gracefully shutdown all pipeline processes."""
-    input_producer.join()
-
-    for worker in processes:
-        worker.join()
-
-    agregator_queue.put(None)
-    agg_process.join()
-
-    # Signal output consumers to shutdown
-    output_queue.put(None)
-
-    # Wait for output consumers
-    for proc in output_processes:
-        proc.join()
 
     return
 
@@ -62,64 +153,14 @@ def bootstrap():
         config = json.load(f)
 
     print_header()
+    pipeline = Pipeline(config)
+    pipeline.bootstrap()
 
-    validator = InputValidator(config)
-    is_valid, message = validator.validate_all()
-    if not is_valid:
-        logger.error(f"Config validation failed:\n{message}")
-        raise ProducerError(f"Invalid config: {message}")
 
-    print(f"* Config validation passed")
-
-    # Initialize queues and processes
-    processes = []
-    output_processes = []
-    queue_size = config["pipeline_dynamics"]["stream_queue_max_size"]
-    workers = 5  
-
-    input_queue = mp.Queue(maxsize=queue_size)
-    agregator_queue = mp.Queue(maxsize=queue_size)
-    output_queue = mp.Queue(maxsize=queue_size)
-
-    # Start input producer
-    print("Starting Input Producer...")
-    input_delay = config["pipeline_dynamics"]["input_delay_seconds"]
-    producer = GenericInputProducer(input_queue,config["schema_mapping"], input_delay)
-    input_producer = mp.Process(target=producer.run, args=(config["dataset_path"],))
-    input_producer.start()
-
-    # Start core workers
-    print("Starting Core Workers...")
-    initialize_multiprocessing(processes, input_queue, agregator_queue, workers, config["processing"])
-
-    # Start aggregator
-    print("Starting Aggregator...")
-    agg = Agregator(agregator_queue, output_queue, queue_size)
-    agg_process = mp.Process(target=agg.agregate)
-    agg_process.start()
-
-    # Start output consumers
-    print("Starting Output Consumers...\n")
-
-    # ============================================================
-    # OUTPUT CONSUMER SELECTION
-    # ============================================================
-    # Uncomment ONE of the two sections below to choose which
-    # output consumer to use:
-    #
     # Option 1: CONSOLE OUTPUT
     # Uncomment the section below to see real-time console output
     # ============================================================
 
-    # Console consumer
-    try:
-        console_consumer = ConsoleConsumer(output_queue)
-        console_process = mp.Process(target=console_consumer.consume)
-        console_process.start()
-        output_processes.append(console_process)
-        print("  ✓ Console consumer started\n")
-    except Exception as e:
-        print(f"  ✗ Failed to start console consumer: {e}\n")
 
     # ============================================================
     # Option 2: GUI DASHBOARD (Requires matplotlib)
@@ -141,17 +182,6 @@ def bootstrap():
 
     # ============================================================
 
-    # Setup graceful shutdown handler
-    def on_all_done():
-        """Called when all output is complete."""
-        shutdown_everything(input_producer, processes, input_queue, agg_process, agregator_queue, output_processes, output_queue)
-
-    shutdown_manager = threading.Thread(target=on_all_done)
-    shutdown_manager.daemon = True
-    shutdown_manager.start()
-
-    # Wait for shutdown manager to complete
-    shutdown_manager.join()
 
     print("\n" + "=" * 70)
     print("  Pipeline Complete")
@@ -160,4 +190,8 @@ def bootstrap():
 
 if __name__ == "__main__":
     bootstrap()
+
+
+
+
 
