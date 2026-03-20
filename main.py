@@ -5,14 +5,19 @@ SDA Project Phase 3 - Complete Pipeline with Input, Core, Output
 from plugins.inputs.generic_producer import GenericInputProducer
 from plugins.inputs.input_validator import InputValidator
 from plugins.outputs import ConsoleConsumer, GUIConsumer
-from core import CoreLogic, Agregator
+from core import Agregator
 from core import CoreManager
+from core import Observer,Telemetry
 import multiprocessing as mp
 import json
 from pathlib import Path
 import sys
 import threading
 import logging
+
+class Observer_Telemetry(Observer):
+    def update(self,data):
+        print(data)
 
 class Pipeline:
     def __init__(self,config):
@@ -37,6 +42,7 @@ class Pipeline:
         self.run_core()
         # start aggregate process
         self.run_agregate()
+        self.run_telemetry()
 
         self.run_output()
 
@@ -67,6 +73,17 @@ class Pipeline:
     def shutdown_input(self):
         self.input_producer.join()
         return
+    def run_telemetry(self):
+        self.see = Observer_Telemetry()
+        self.telemetry = Telemetry(self.input_queue, self.agregator_queue, self.output_queue)
+        self.telemetry.subscribe(self.see)
+        self.telemetry_proc = mp.Process(target=self.telemetry.poll, args=(0.01,))
+        self.telemetry_proc.start()
+        return
+    def shutdown_telemetry(self):
+        self.telemetry.quit()
+        self.telemetry_proc.join()
+        return
     def run_core(self):
         # Start core workers
         print("Starting Core Workers...")
@@ -79,7 +96,7 @@ class Pipeline:
     def run_agregate(self):
         # Start aggregator
         print("Starting Aggregator...")
-        agg = Agregator(self.agregator_queue, self.output_queue, self.queue_size)
+        agg = Agregator(self.agregator_queue, self.output_queue, self.config["processing"]["stateful_tasks"]["running_average_window_size"])
         self.agg_process = mp.Process(target=agg.agregate)
         self.agg_process.start()
         return
@@ -92,6 +109,7 @@ class Pipeline:
             self.shutdown_input()
             self.shutdown_core()
             self.shutdown_agregate()
+            self.shutdown_telemetry()
             self.shutdown_output()
             return
         shutdown_manager = threading.Thread(target=shutdown, args=(self,))
@@ -117,7 +135,7 @@ class Pipeline:
             console_process = mp.Process(target=console_consumer.consume)
             console_process.start()
             self.output_processes.append(console_process)
-            print("  ✓ Console consumer started\n")
+            # print("  ✓ Console consumer started\n")
         except Exception as e:
             print(f"  ✗ Failed to start console consumer: {e}\n")
         return
@@ -129,11 +147,6 @@ class Pipeline:
         for proc in self.output_processes:
             proc.join()
         return 
-
-def shutdown_everything(input_producer, core, input_queue, agg_process, agregator_queue, output_processes, output_queue):
-    """Gracefully shutdown all pipeline processes."""
-
-    return
 
 def print_header():
     print("\n" + "=" * 70)
@@ -154,7 +167,10 @@ def bootstrap():
 
     print_header()
     pipeline = Pipeline(config)
-    pipeline.bootstrap()
+    try:
+        pipeline.bootstrap()
+    except KeyboardInterrupt:
+        print("\n[MAIN] Pipeline gracefully terminated by user (Ctrl+C).")
 
 
     # Option 1: CONSOLE OUTPUT

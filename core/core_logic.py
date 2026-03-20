@@ -14,25 +14,29 @@ class CoreLogic:
         self.config = config
         return
     def process(self):
-        queue = self.input_queue
-        while True:
-            packet = queue.get() 
-            if packet is None:
-                # Agle process ke liye EOF behj do
-                queue.put(None)
-                return
+        try:
+            queue = self.input_queue
+            while True:
+                packet = queue.get() 
+                if packet is None:
+                    # Agle process ke liye EOF behj do
+                    queue.put(None)
+                    return
 
-            isPacketValid = self._validate(packet)
-            if (isPacketValid):
-                packet["isValid"] = True
-            else:
-                # ye issliye taake bara package na jaaye, aur thora kaam optimize ho jaaye
-                packet = {
-                    "_id":packet["_id"],
-                    "isValid": False
-                }
+                isPacketValid = self._validate(packet)
+                if (isPacketValid):
+                    packet["isValid"] = True
+                else:
+                    # ye issliye taake bara package na jaaye, aur thora kaam optimize ho jaaye
+                    print("Invalid Packet")
+                    packet = {
+                        "_id":packet["_id"],
+                        "isValid": False
+                    }
 
-            self.output_queue.put(packet)
+                self.output_queue.put(packet)
+        except KeyboardInterrupt:
+            pass
         return
     def _validate(self,packet):
         key = self.config['stateless_tasks']['secret_key']
@@ -51,20 +55,23 @@ class Agregator:
         self.output = output_queue
         return
     def agregate(self):
-        while True:
-            received_packet = self.queue.get()
-            if received_packet is None:
-                # POISON PILL
-                self.output.put(None)
-                return
+        try:
+            while True:
+                received_packet = self.queue.get()
+                if received_packet is None:
+                    # POISON PILL
+                    self.output.put(None)
+                    return
 
-            heapq.heappush(self.pq,(received_packet["_id"],received_packet))
-            while self.pq and self.pq[0][0] == self.expected_id:
-                _, packet_to_process = heapq.heappop(self.pq)
-                avg = self._generate_output(packet_to_process)
-                if avg is not None:
-                    self.output.put(avg)
-                self.expected_id +=1
+                heapq.heappush(self.pq,(received_packet["_id"],received_packet))
+                while self.pq and self.pq[0][0] == self.expected_id:
+                    _, packet_to_process = heapq.heappop(self.pq)
+                    avg = self._generate_output(packet_to_process)
+                    if avg is not None:
+                        self.output.put(avg)
+                    self.expected_id +=1
+        except KeyboardInterrupt:
+            pass
 
     def _generate_output(self,packet):
         if (packet["isValid"]):

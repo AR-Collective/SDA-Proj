@@ -79,7 +79,7 @@ class BaseOutputConsumer(ABC):
             while not self.shutdown_requested:
                 try:
                     # Use timeout to allow non-blocking operation
-                    value = self.queue.get(timeout=1)
+                    value = self.queue.get()
 
                     # Check for poison pill (stream end)
                     if value is None:
@@ -90,7 +90,7 @@ class BaseOutputConsumer(ABC):
                     self._update_stats(value)
 
                     # Call subclass display logic
-                    self.on_value_received(value)
+                    # self.on_value_received(value)
 
                 except Exception as e:
                     self.logger.error(f"Error processing value: {e}")
