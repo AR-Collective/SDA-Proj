@@ -171,6 +171,8 @@ def bootstrap():
         pipeline.bootstrap()
     except KeyboardInterrupt:
         print("\n[MAIN] Pipeline gracefully terminated by user (Ctrl+C).")
+        for p in mp.active_children():
+            p.terminate()
 
 
     # Option 1: CONSOLE OUTPUT

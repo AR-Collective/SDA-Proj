@@ -33,6 +33,7 @@ from typing import Dict, Any, Optional, Generator
 from multiprocessing import Queue
 import logging
 import traceback
+import queue
 
 
 # Setup logging
@@ -247,7 +248,7 @@ class GenericInputProducer:
                 # Dropped timeout to 2 seconds so Ctrl+C shuts down faster
                 self.input_queue.put(None, timeout=2)  
                 logger.info(f"✓ End-of-stream sentinel sent")
-            except Queue.full:
+            except queue.Full:
                 # Catch the error if workers are dead and queue is maxed out
                 logger.warning("Queue full during shutdown, dropping EOF sentinel.")
 
