@@ -3,8 +3,11 @@ from collections import deque
 from .hash_function import validate_signature
 import json
 import multiprocessing as mp
+from typing import Protocol
+import time
+import signal
 
-class Core:
+class CoreLogic:
     def __init__(self, input_queue: mp.Queue, aggregator_queue: mp.Queue, config)-> None:
         self.input_queue = input_queue
         self.output_queue = aggregator_queue
@@ -68,3 +71,5 @@ class Agregator:
             self.deque.append(float(packet['metric_value']))
             running_avg = sum(self.deque)/len(self.deque)
             return running_avg
+
+
