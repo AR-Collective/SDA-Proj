@@ -243,10 +243,13 @@ class GenericInputProducer:
                     logger.error(f"Failed to queue row stopping producer")
                     break
 
-            # Signal end-of-stream to core workers
-            logger.info(f"Sending end-of-stream sentinel to queue...")
-            self.input_queue.put(None, timeout=10)  # None = EOF marker
-            logger.info(f"✓ End-of-stream sentinel sent")
+            try:
+                # Dropped timeout to 2 seconds so Ctrl+C shuts down faster
+                self.input_queue.put(None, timeout=2)  
+                logger.info(f"✓ End-of-stream sentinel sent")
+            except Queue.full:
+                # Catch the error if workers are dead and queue is maxed out
+                logger.warning("Queue full during shutdown, dropping EOF sentinel.")
 
         except KeyboardInterrupt:
             logger.info("Producer interrupted by user")
