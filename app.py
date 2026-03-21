@@ -9,6 +9,73 @@ import json
 import time
 import pandas as pd
 from datetime import datetime
+import plotly.graph_objects as go
+
+# ============================================================
+# HELPER FUNCTIONS FOR ADVANCED CHARTS
+# ============================================================
+
+def create_line_chart(data):
+    """Create a line chart visualization."""
+    df = pd.DataFrame({'Value': data, 'Index': range(len(data))})
+    return st.line_chart(df.set_index('Index')[['Value']], use_container_width=True)
+
+def create_area_chart(data):
+    """Create an area chart visualization."""
+    df = pd.DataFrame({
+        'Running Average': data,
+        'Index': range(len(data))
+    })
+    return st.area_chart(df.set_index('Index')[['Running Average']], use_container_width=True)
+
+def create_bar_chart(data):
+    """Create a bar chart visualization."""
+    df = pd.DataFrame({
+        'Value': data,
+        'Index': range(len(data))
+    })
+    return st.bar_chart(df.set_index('Index')[['Value']], use_container_width=True)
+
+def create_scatter_plot(data):
+    """Create a scatter plot visualization."""
+    df = pd.DataFrame({
+        'Value': data,
+        'Index': range(len(data))
+    })
+    return st.scatter_chart(df.set_index('Index')[['Value']], use_container_width=True)
+
+def create_combined_chart(data):
+    """Create a combined line + area chart using Plotly."""
+    fig = go.Figure()
+
+    # Add area trace
+    fig.add_trace(go.Scatter(
+        y=data,
+        mode='lines',
+        name='Running Average',
+        fill='tozeroy',
+        line=dict(color='rgba(59, 130, 246, 0.8)', width=2),
+        fillcolor='rgba(59, 130, 246, 0.2)',
+        hovertemplate='<b>Value:</b> %{y:.4f}<extra></extra>'
+    ))
+
+    # Styling
+    fig.update_layout(
+        title='Live Sensor Data',
+        xaxis_title='Sample #',
+        yaxis_title='Value',
+        template='plotly_dark',
+        height=400,
+        hovermode='x unified',
+        margin=dict(l=50, r=50, t=50, b=50),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(20, 30, 50, 0.3)',
+        font=dict(color='white'),
+        xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
+        yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
+    )
+
+    return st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================
 # PAGE CONFIGURATION & THEMING
@@ -75,7 +142,7 @@ st.markdown("""
 
     /* Divider */
     hr {
-        border-color: rgba(96, 165, 250, 0.3);
+        border-color: rgba(255, 255, 255, 0.5) !important;
     }
 
     /* Buttons */
@@ -140,6 +207,17 @@ st.markdown("""
     /* Download button */
     [data-testid="stDownloadButton"] button {
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    /* Sidebar headings */
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] h4 {
+        color: white !important;
+    }
+
+    [data-testid="stSidebar"] markdown h3,
+    [data-testid="stSidebar"] markdown h4 {
+        color: white !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -214,6 +292,22 @@ with st.sidebar:
 
     st.divider()
 
+    # Chart type selection
+    st.markdown("### 📊 Chart Type")
+    chart_type = st.selectbox(
+        "Choose visualization type",
+        options=[
+            "📈 Line Chart",
+            "📊 Area Chart",
+            "📉 Bar Chart",
+            "🎯 Scatter Plot",
+            "🔀 Combined (Line + Fill)"
+        ],
+        key="chart_type_selector"
+    )
+
+    st.divider()
+
     # Data management
     st.markdown("### 💾 Data Management")
     col1, col2 = st.columns(2)
@@ -242,22 +336,6 @@ with st.sidebar:
             st.rerun()
 
     st.divider()
-
-    # About section
-    with st.expander("ℹ️ About", expanded=False):
-        st.markdown("""
-        **Executive Summary Dashboard**
-
-        Real-time visualization of sensor data processing pipeline:
-        - Input: CSV sensor data
-        - Processing: PBKDF2 signature verification
-        - Aggregation: Running averages
-        - Output: Live UDP stream
-
-        **UDP Port**: 5005
-        **Refresh Rate**: 50ms
-        **Max Buffer**: 50-200 points
-        """)
 
 # ============================================================
 # MAIN CONTENT AREA
@@ -316,12 +394,55 @@ while run_streaming:
 
         # ========== DISPLAY CHART ==========
         with chart_placeholder.container():
-            st.line_chart(
-                pd.DataFrame({
-                    'Running Average': st.session_state.data_list
-                }),
-                use_container_width=True
-            )
+            chart_type_selected = st.session_state.get('chart_type_selector', '📈 Line Chart')
+
+            if '📈 Line Chart' in chart_type_selected:
+                st.line_chart(
+                    pd.DataFrame({'Running Average': st.session_state.data_list}),
+                    use_container_width=True
+                )
+            elif '📊 Area Chart' in chart_type_selected:
+                st.area_chart(
+                    pd.DataFrame({'Running Average': st.session_state.data_list}),
+                    use_container_width=True
+                )
+            elif '📉 Bar Chart' in chart_type_selected:
+                st.bar_chart(
+                    pd.DataFrame({'Running Average': st.session_state.data_list}),
+                    use_container_width=True
+                )
+            elif '🎯 Scatter Plot' in chart_type_selected:
+                df_scatter = pd.DataFrame({
+                    'Index': range(len(st.session_state.data_list)),
+                    'Value': st.session_state.data_list
+                })
+                st.scatter_chart(df_scatter, x='Index', y='Value', use_container_width=True)
+            elif '🔀 Combined' in chart_type_selected:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    y=st.session_state.data_list,
+                    mode='lines',
+                    name='Running Average',
+                    fill='tozeroy',
+                    line=dict(color='rgba(59, 130, 246, 0.8)', width=2),
+                    fillcolor='rgba(59, 130, 246, 0.2)',
+                    hovertemplate='<b>Value:</b> %{y:.4f}<extra></extra>'
+                ))
+                fig.update_layout(
+                    title='Live Sensor Data',
+                    xaxis_title='Sample #',
+                    yaxis_title='Value',
+                    template='plotly_dark',
+                    height=400,
+                    hovermode='x unified',
+                    margin=dict(l=50, r=50, t=50, b=50),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(20, 30, 50, 0.3)',
+                    font=dict(color='white'),
+                    xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
+                    yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
         # ========== DISPLAY STATISTICS ==========
         if st.session_state.data_list:
@@ -443,12 +564,56 @@ if not run_streaming:
     if st.session_state.data_list:
         with chart_placeholder.container():
             st.info("⏸️ Stream paused - showing last data")
-            st.line_chart(
-                pd.DataFrame({
-                    'Running Average': st.session_state.data_list
-                }),
-                use_container_width=True
-            )
+
+            chart_type_selected = st.session_state.get('chart_type_selector', '📈 Line Chart')
+
+            if '📈 Line Chart' in chart_type_selected:
+                st.line_chart(
+                    pd.DataFrame({'Running Average': st.session_state.data_list}),
+                    use_container_width=True
+                )
+            elif '📊 Area Chart' in chart_type_selected:
+                st.area_chart(
+                    pd.DataFrame({'Running Average': st.session_state.data_list}),
+                    use_container_width=True
+                )
+            elif '📉 Bar Chart' in chart_type_selected:
+                st.bar_chart(
+                    pd.DataFrame({'Running Average': st.session_state.data_list}),
+                    use_container_width=True
+                )
+            elif '🎯 Scatter Plot' in chart_type_selected:
+                df_scatter = pd.DataFrame({
+                    'Index': range(len(st.session_state.data_list)),
+                    'Value': st.session_state.data_list
+                })
+                st.scatter_chart(df_scatter, x='Index', y='Value', use_container_width=True)
+            elif '🔀 Combined' in chart_type_selected:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    y=st.session_state.data_list,
+                    mode='lines',
+                    name='Running Average',
+                    fill='tozeroy',
+                    line=dict(color='rgba(59, 130, 246, 0.8)', width=2),
+                    fillcolor='rgba(59, 130, 246, 0.2)',
+                    hovertemplate='<b>Value:</b> %{y:.4f}<extra></extra>'
+                ))
+                fig.update_layout(
+                    title='Live Sensor Data',
+                    xaxis_title='Sample #',
+                    yaxis_title='Value',
+                    template='plotly_dark',
+                    height=400,
+                    hovermode='x unified',
+                    margin=dict(l=50, r=50, t=50, b=50),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(20, 30, 50, 0.3)',
+                    font=dict(color='white'),
+                    xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
+                    yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
         # Show final statistics
         with stats_placeholder.container():
@@ -475,11 +640,12 @@ if not run_streaming:
                 with col5:
                     st.metric(label="⬇️ Min", value=f"{min_val:.4f}")
     else:
-        st.info("👈 Enable 'Start Live Stream' in the sidebar to begin receiving data")
+        with chart_placeholder.container():
+            st.info("⏸️ Stream paused - no data received yet")
+        st.markdown("### 🚀 Getting Started")
         st.write("""
-        **Getting Started:**
         1. Click the 'Start Live Stream' checkbox in the sidebar
-        2. Watch real-time data stream in from UDP:5005
+        2. Run python main.py to start the data pipeline
         3. See live chart updates and statistics
         4. Use the sidebar to export or clear data
         """)
