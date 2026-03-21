@@ -292,9 +292,20 @@ with st.sidebar:
 
     st.divider()
 
+    # Refresh rate setting
+    st.markdown("### ⚡ Performance")
+    refresh_rate_ms = st.slider(
+        "Refresh rate (milliseconds)",
+        min_value=10,
+        max_value=100,
+        value=20,
+        step=5,
+        help="Lower = faster updates, Higher = smoother but slower"
+    )
+
     # Chart type selection
     st.markdown("### 📊 Chart Type")
-    chart_type = st.selectbox(
+    chart_type = st.radio(
         "Choose visualization type",
         options=[
             "📈 Line Chart",
@@ -303,6 +314,7 @@ with st.sidebar:
             "🎯 Scatter Plot",
             "🔀 Combined (Line + Fill)"
         ],
+        horizontal=True,
         key="chart_type_selector"
     )
 
@@ -555,7 +567,7 @@ while run_streaming:
         with status_placeholder.container():
             st.error(f"❌ Error: {str(e)}")
 
-    time.sleep(0.05)  # 50ms refresh rate
+    time.sleep(refresh_rate_ms / 1000)  # Convert milliseconds to seconds
 
 # ============================================================
 # PAUSED STATE
