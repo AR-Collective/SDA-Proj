@@ -1,20 +1,36 @@
 """
 SDA Project Phase 3 - Complete Pipeline with Input, Core, Output
 """
-
-from plugins.inputs.generic_producer import GenericInputProducer
-from plugins.inputs.input_validator import InputValidator
-from plugins.outputs import ConsoleConsumer, GUIConsumer
-from core import Agregator
-from core import CoreManager
-from core import Observer,Telemetry
-import multiprocessing as mp
-import json
-from pathlib import Path
-import sys
-import threading
 import logging
+import threading
+import sys
+from pathlib import Path
+import json
+import multiprocessing as mp
+from core import Observer,Telemetry
+from core import CoreManager
+from core import Agregator
+# from plugins.outputs import ConsoleConsumer, GUIConsumer
+from plugins.inputs.input_validator import InputValidator
+from plugins.inputs.generic_producer import GenericInputProducer
+from multiprocessing.managers import BaseManager
+import subprocess
+import time
+import socket
 
+# Create a UDP socket
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+UDP_IP = "127.0.0.1"
+UDP_PORT = 5005
+
+def worker(output_queue):
+    while True:
+        data = output_queue.get()
+        if data is None:
+            return
+        time.sleep(0.1)
+        message = json.dumps(data).encode('utf-8')
+        sock.sendto(message, (UDP_IP, UDP_PORT))
 class Observer_Telemetry(Observer):
     def update(self,data):
         print(data)
@@ -120,32 +136,16 @@ class Pipeline:
 
     def run_output(self):
 
-        self.output_processes = []
-        # Initialize queues and processes
-
-        # ============================================================
-        # OUTPUT CONSUMER SELECTION
-        # ============================================================
-        # Uncomment ONE of the two sections below to choose which
-        # output consumer to use:
-        #
-        # Console consumer
-        try:
-            console_consumer = ConsoleConsumer(self.output_queue)
-            console_process = mp.Process(target=console_consumer.consume)
-            console_process.start()
-            self.output_processes.append(console_process)
-            # print("  ✓ Console consumer started\n")
-        except Exception as e:
-            print(f"  ✗ Failed to start console consumer: {e}\n")
+        self.gui_process = mp.Process(target=worker, args=(self.output_queue,))
+        self.gui_process.start()
         return
+
     def shutdown_output(self):
         # Signal output consumers to shutdown
         self.output_queue.put(None)
+        self.gui_process.join()
 
-        # Wait for output consumers
-        for proc in self.output_processes:
-            proc.join()
+
         return 
 
 def print_header():
@@ -173,33 +173,6 @@ def bootstrap():
         print("\n[MAIN] Pipeline gracefully terminated by user (Ctrl+C).")
         for p in mp.active_children():
             p.terminate()
-
-
-    # Option 1: CONSOLE OUTPUT
-    # Uncomment the section below to see real-time console output
-    # ============================================================
-
-
-    # ============================================================
-    # Option 2: GUI DASHBOARD (Requires matplotlib)
-    # Comment out the Console consumer above and uncomment this
-    # section to see live graph and statistics panel
-    # ============================================================
-
-    # # GUI consumer
-    # try:
-    #     gui_consumer = GUIConsumer(output_queue)
-    #     gui_process = mp.Process(target=gui_consumer.consume)
-    #     gui_process.start()
-    #     output_processes.append(gui_process)
-    #     print("  ✓ GUI consumer started\n")
-    # except ImportError:
-    #     print("  ⚠ GUI consumer skipped (matplotlib not available)\n")
-    # except Exception as e:
-    #     print(f"  ✗ Failed to start GUI consumer: {e}\n")
-
-    # ============================================================
-
 
     print("\n" + "=" * 70)
     print("  Pipeline Complete")
