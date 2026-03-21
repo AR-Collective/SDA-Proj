@@ -10,6 +10,36 @@ import time
 import pandas as pd
 from datetime import datetime
 import plotly.graph_objects as go
+from pathlib import Path
+
+# ============================================================
+# CONFIGURATION MANAGEMENT
+# ============================================================
+
+def load_config():
+    """Load configuration from config.json."""
+    config_path = Path("config.json")
+    if config_path.exists():
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_config(config):
+    """Save configuration to config.json."""
+    config_path = Path("config.json")
+    with open(config_path, 'w') as f:
+        json.dump(config, f, indent=2)
+
+# Initialize config in session state
+if "config" not in st.session_state:
+    st.session_state.config = load_config()
+    # Ensure all required keys exist
+    if "pipeline_dynamics" not in st.session_state.config:
+        st.session_state.config["pipeline_dynamics"] = {}
+    if "processing" not in st.session_state.config:
+        st.session_state.config["processing"] = {"stateful_tasks": {}}
+    elif "stateful_tasks" not in st.session_state.config.get("processing", {}):
+        st.session_state.config["processing"]["stateful_tasks"] = {}
 
 # ============================================================
 # HELPER FUNCTIONS FOR ADVANCED CHARTS
@@ -302,6 +332,98 @@ with st.sidebar:
         step=5,
         help="Lower = faster updates, Higher = smoother but slower"
     )
+
+    st.divider()
+
+    # Configuration settings
+    st.markdown("### ⚙️ Pipeline Configuration")
+
+    with st.expander("🔧 Advanced Settings", expanded=False):
+        config = st.session_state.config
+
+        # Pipeline Dynamics
+        st.markdown("**Pipeline Dynamics**")
+        col_pdyn1, col_pdyn2 = st.columns(2)
+
+        with col_pdyn1:
+            input_delay = st.number_input(
+                "Input Delay (sec)",
+                min_value=0.001,
+                max_value=1.0,
+                value=config.get("pipeline_dynamics", {}).get("input_delay_seconds", 0.01),
+                step=0.001,
+                format="%.4f",
+                help="Delay between reading CSV rows"
+            )
+            config["pipeline_dynamics"]["input_delay_seconds"] = input_delay
+
+        with col_pdyn2:
+            core_parallelism = st.number_input(
+                "Core Parallelism",
+                min_value=1,
+                max_value=16,
+                value=config.get("pipeline_dynamics", {}).get("core_parallelism", 2),
+                step=1,
+                help="Number of parallel core workers"
+            )
+            config["pipeline_dynamics"]["core_parallelism"] = core_parallelism
+
+        stream_queue = st.slider(
+            "Stream Queue Size",
+            min_value=10,
+            max_value=200,
+            value=config.get("pipeline_dynamics", {}).get("stream_queue_max_size", 50),
+            step=5,
+            help="Maximum size of the processing queue"
+        )
+        config["pipeline_dynamics"]["stream_queue_max_size"] = stream_queue
+
+        # Processing settings
+        st.markdown("**Processing**")
+        window_size = st.slider(
+            "Running Average Window",
+            min_value=1,
+            max_value=50,
+            value=config.get("processing", {}).get("stateful_tasks", {}).get("running_average_window_size", 10),
+            step=1,
+            help="Sample window for running average calculation"
+        )
+        config["processing"]["stateful_tasks"]["running_average_window_size"] = window_size
+
+        # Save/Reload buttons
+        col_save1, col_save2 = st.columns([1, 1])
+        with col_save1:
+            save_clicked = st.button("💾 Save to config.json", use_container_width=True)
+
+        with col_save2:
+            reload_clicked = st.button("🔄 Reload from File", use_container_width=True)
+
+        # Messages (full width)
+        if save_clicked:
+            try:
+                save_config(config)
+                st.session_state.config = config
+                st.success("✅ Configuration saved successfully!")
+            except Exception as e:
+                st.error(f"❌ Error saving config: {str(e)}")
+
+        if reload_clicked:
+            try:
+                st.session_state.config = load_config()
+                st.info("✓ Configuration reloaded")
+            except Exception as e:
+                st.error(f"❌ Error reloading config: {str(e)}")
+
+        # Display current config summary
+        st.markdown("**Current Configuration Summary**")
+        st.json({
+            "input_delay_seconds": config.get("pipeline_dynamics", {}).get("input_delay_seconds", 0.01),
+            "core_parallelism": config.get("pipeline_dynamics", {}).get("core_parallelism", 2),
+            "stream_queue_max_size": config.get("pipeline_dynamics", {}).get("stream_queue_max_size", 50),
+            "running_average_window_size": config.get("processing", {}).get("stateful_tasks", {}).get("running_average_window_size", 10)
+        })
+
+    st.divider()
 
     # Chart type selection
     st.markdown("### 📊 Chart Type")
