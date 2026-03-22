@@ -11,6 +11,8 @@ import pandas as pd
 from datetime import datetime
 import plotly.graph_objects as go
 from pathlib import Path
+import subprocess
+import os
 
 # ============================================================
 # CONFIGURATION MANAGEMENT
@@ -40,6 +42,90 @@ if "config" not in st.session_state:
         st.session_state.config["processing"] = {"stateful_tasks": {}}
     elif "stateful_tasks" not in st.session_state.config.get("processing", {}):
         st.session_state.config["processing"]["stateful_tasks"] = {}
+
+# ============================================================
+# PROCESS MANAGEMENT
+# ============================================================
+
+def start_pipeline():
+    """Start the main.py pipeline process."""
+    if "pipeline_running" in st.session_state and st.session_state.pipeline_running:
+        return False  # Already running
+
+    try:
+        # Get the current working directory
+        cwd = os.getcwd()
+
+        # Start process in non-blocking mode, redirect output to devnull to avoid deadlock
+        process = subprocess.Popen(
+            ["python3", "main.py"],
+            cwd=cwd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True  # Detach from parent process
+        )
+        st.session_state.pipeline_process = process
+        st.session_state.pipeline_running = True
+        st.session_state.pipeline_start_time = datetime.now()
+        return True
+    except Exception as e:
+        st.session_state.pipeline_running = False
+        raise e
+
+def stop_pipeline():
+    """Stop the main.py pipeline process."""
+    if "pipeline_process" not in st.session_state:
+        return False
+
+    try:
+        process = st.session_state.pipeline_process
+
+        # Check if process is still running
+        if process.poll() is not None:
+            # Already terminated
+            st.session_state.pipeline_running = False
+            if "pipeline_process" in st.session_state:
+                del st.session_state.pipeline_process
+            return True
+
+        # Send terminate signal
+        process.terminate()
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            # Force kill if it doesn't respond
+            process.kill()
+            process.wait()
+
+        st.session_state.pipeline_running = False
+        if "pipeline_process" in st.session_state:
+            del st.session_state.pipeline_process
+        return True
+    except Exception as e:
+        st.session_state.pipeline_running = False
+        raise e
+
+def is_pipeline_running():
+    """Check if pipeline process is still running."""
+    if "pipeline_process" not in st.session_state:
+        st.session_state.pipeline_running = False
+        return False
+
+    process = st.session_state.pipeline_process
+    if process.poll() is None:  # Process still running
+        return True
+    else:
+        st.session_state.pipeline_running = False
+        if "pipeline_process" in st.session_state:
+            del st.session_state.pipeline_process
+        return False
+
+# Initialize process state
+if "pipeline_running" not in st.session_state:
+    st.session_state.pipeline_running = False
+
+if "pipeline_start_time" not in st.session_state:
+    st.session_state.pipeline_start_time = None
 
 # ============================================================
 # HELPER FUNCTIONS FOR ADVANCED CHARTS
@@ -290,23 +376,68 @@ if "packet_count" not in st.session_state:
     st.session_state.packet_count = 0
 
 # ============================================================
+# MAIN CONTENT AREA PLACEHOLDERS (created once)
+# ============================================================
+
+st.markdown("### 📉 Live Sensor Data Chart")
+chart_placeholder = st.empty()
+
+st.markdown("### 📊 Real-time Statistics")
+stats_placeholder = st.empty()
+
+status_placeholder = st.empty()
+
+# ============================================================
 # SIDEBAR CONTROLS
 # ============================================================
 with st.sidebar:
     st.markdown("### ⚙️ Pipeline Controls")
     st.divider()
 
-    # Stream toggle
+    # Integrated Start Live Stream with process management
     run_streaming = st.checkbox("🎯 Start Live Stream", value=False)
+
+    # Start/stop pipeline process based on checkbox state
+    if run_streaming:
+        is_running = is_pipeline_running()
+        if not is_running:
+            try:
+                start_pipeline()
+                time.sleep(0.5)
+            except Exception as e:
+                st.error(f"❌ Failed to start pipeline: {str(e)}")
+    else:
+        is_running = is_pipeline_running()
+        if is_running:
+            try:
+                stop_pipeline()
+            except Exception as e:
+                st.error(f"❌ Failed to stop pipeline: {str(e)}")
+
+        # Reset display state when stopping
+        with chart_placeholder.container():
+            st.empty()
+        with stats_placeholder.container():
+            st.empty()
+        with status_placeholder.container():
+            st.empty()
 
     st.divider()
 
-    # Info section
+    # Info section - shows both stream and backend status
     st.markdown("### 📡 Connection Status")
     if run_streaming:
-        st.success("✓ Listening on UDP:5005")
+        is_running = is_pipeline_running()
+        if is_running and st.session_state.pipeline_start_time:
+            uptime_sec = (datetime.now() - st.session_state.pipeline_start_time).total_seconds()
+            hours = int(uptime_sec // 3600)
+            minutes = int((uptime_sec % 3600) // 60)
+            uptime = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+            st.success(f"✓ Stream Active • Backend Running ({uptime})")
+        else:
+            st.warning("⚠ Stream Active • Backend Starting...")
     else:
-        st.info("⊗ Stream paused")
+        st.info("⊗ Stream Paused")
 
     st.divider()
 
@@ -470,26 +601,6 @@ with st.sidebar:
             st.rerun()
 
     st.divider()
-
-# ============================================================
-# MAIN CONTENT AREA
-# ============================================================
-
-# Create main layout
-col_chart = st.container()
-col_stats = st.container()
-
-# Chart placeholder
-with col_chart:
-    st.markdown("### 📉 Live Sensor Data Chart")
-    chart_placeholder = st.empty()
-
-# Statistics section
-with col_stats:
-    st.markdown("### 📊 Real-time Statistics")
-    stats_placeholder = st.empty()
-
-status_placeholder = st.empty()
 
 # ============================================================
 # MAIN STREAM LOOP
