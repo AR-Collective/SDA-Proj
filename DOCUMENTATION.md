@@ -1,544 +1,579 @@
-# SDA Project — Phase 2 Documentation
+# 📚 SDA Phase 3 — Complete Documentation
 
-> **📌 Complete API documentation is available in the Sphinx docs. See [Building Documentation](#building-documentation) section below.**
+**In-depth technical guide for SDA real-time sensor data pipeline.**
+
+---
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [Architecture Overview](#architecture-overview)
-3. [Building Documentation](#building-documentation)
-4. [Phase 2 Components](#phase-2-components)
-5. [Configuration](#configuration)
-6. [Extending the System](#extending-the-system)
-7. [Troubleshooting](#troubleshooting)
+1. [System Architecture](#system-architecture)
+2. [Features & Capabilities](#features--capabilities)
+3. [Data Flow & Queues](#data-flow--queues)
+4. [Configuration Reference](#configuration-reference)
+5. [GUI Controls & Features](#gui-controls--features)
+6. [Troubleshooting Guide](#troubleshooting-guide)
+7. [Advanced Topics](#advanced-topics)
 
 ---
 
-## Quick Start
+## System Architecture
 
-### Install Dependencies
+### Complete Pipeline Flow
 
-```bash
-cd /Users/asjadraza/SDA-Proj
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Streamlit GUI (app.py)                  │
+│  - Dark theme dashboard with 4 chart types                      │
+│  - 9 real-time statistics panel                                 │
+│  - Configuration management UI                                  │
+│  - Process control (Start Live Stream toggle)                   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ Starts via subprocess
+                           ↓
+┌──────────────────────────────────────────────────────────────────┐
+│                      main.py - Pipeline Class                    │
+│                                                                  │
+│  · bootstrap() - Initialize all processes                       │
+│  · validate_config() - Check config.json                        │
+│  · init_queues() - Create bounded ipc queues                    │
+│  · run_input() - Start GenericInputProducer                     │
+│  · run_core() - Start CoreManager + workers                     │
+│  · run_agregate() - Start Agregator                             │
+│  · run_telemetry() - Start Telemetry monitor                    │
+│  · run_output() - Start UDP worker                              │
+│  · shutdown_all() - Graceful shutdown                           │
+└──────────────────────────────────────────────────────────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        ↓                  ↓                  ↓
+   ┌─────────────┐   ┌──────────┐   ┌──────────────┐
+   │ InputProc   │   │ CoreMgr  │   │ Agregator    │
+   │   (reads    │   │ (N workers)  │ (order +avg) │
+   │    CSV)     │   │             │              │
+   └──────┬──────┘   └──────┬──────┘   └──────┬─────┘
+          │ Queue1          │ Queue2          │ Queue3
+          ↓                 ↓                 ↓
+   ┌─────────────────────────────────────────────────┐
+   │          Telemetry Monitor (Observer)           │
+   │  Polls queue sizes every 100ms                  │
+   │  Notifies console with tuple: (Q1, Q2, Q3)      │
+   └─────────────────────────────────────────────────┘
+                           │
+                 ┌─────────┴────────┐
+                 ↓                  ↓
+           ┌──────────┐      ┌─────────────┐
+           │Console   │      │UDP Worker   │
+           │Consumer  │      │(sends float)│
+           └──────────┘      └──────┬──────┘
+                                    │
+                            UDP:127.0.0.1:5005
+                                    │
+                                    ↓
+                    ┌─────────────────────────────┐
+                    │ Streamlit Dashboard (app.py)│
+                    │ Receives + visualizes data  │
+                    └─────────────────────────────┘
 ```
 
-### Run the Application
+### Component Details
 
-```bash
-python main.py
-```
+#### 1. **Input Layer** (`plugins/inputs/`)
 
-The application will:
-1. Load `config.json`
-2. Instantiate input driver (CSV or JSON)
-3. Perform data transformation and analysis
-4. Display results (console or interactive dashboard)
+**GenericInputProducer**
+- Reads CSV row-by-row (streaming)
+- Maps columns via `SchemaMapper` based on `schema_mapping`
+- Applies input throttling with `input_delay_seconds` from config
+- Queues packets to `input_queue` (Queue1)
+- Graceful shutdown on `None` poison pill
+
+**SchemaMapper**
+- Maps arbitrary CSV column names to internal names
+- Type casting: int, float, str, bool
+- Validates schema before processing
+
+**InputValidator**
+- Checks config.json structure
+- Validates required keys
+- Prevents pipeline startup on config errors
+
+#### 2. **Core Processing Layer** (`core/`)
+
+**CoreManager**
+- Spawns N parallel `CoreLogic` worker processes
+- `workers` parameter from `core_parallelism` in config
+- Creates one Process per worker
+- Stores all processes in `processes_arr`
+- Handles graceful worker shutdown
+
+**CoreLogic** (repeated N times)
+- Reads packets from `input_queue` (Queue1)
+- **PBKDF2 HMAC SHA-256 Validation**:
+  - Secret key from config
+  - Iterations from config
+  - Validates `security_hash` field against `metric_value`
+  - Only ~1-2 packets pass (intentional cryptographic filtering)
+  - Invalid packets skipped silently
+- Writes to `agregator_queue` (Queue2) with `isValid` flag
+
+**Agregator**
+- Maintains packet order using `heapq` (priority queue by ID)
+- Uses `deque(maxlen=window_size)` for running average
+- Handles out-of-order packets via priority queue
+- Calculates running average on valid packets only
+- Outputs float values to `output_queue` (Queue3)
+
+**Telemetry + Observer Pattern**
+- Polls queue sizes every 100ms
+- Observer.update(data) notifies subscribers
+- Prints: `(queue1_size, queue2_size, queue3_size)`
+- Non-blocking monitoring
+
+#### 3. **Output Layer** (`plugins/outputs/`)
+
+**BaseOutputConsumer** (abstract)
+- Interface that all consumers implement
+- `consume()` method reads from output_queue
+
+**ConsoleConsumer**
+- Prints float values to console
+- Simple line-by-line output
+
+**GUIConsumer**
+- Runs Matplotlib dashboard
+- Displays real-time charts
+
+**UDP Worker** (in main.py)
+- Reads floats from `output_queue` (Queue3)
+- Sends UDP packets to `127.0.0.1:5005`
+- Streamlit GUI listens on this port
+
+#### 4. **Streamlit GUI** (`app.py`)
+
+**StreamlitApp Features:**
+- Dark theme with blue gradients
+- UDP listener on port 5005
+- Session state for persistence
+- 4 chart types: Line, Area, Bar, Scatter
+- 9 real-time statistics
+- Configuration UI
+- Process start/stop controls
+- Data management (export, clear)
 
 ---
 
-## Architecture Overview
+## Features & Capabilities
 
-**Phase 2** implements **Dependency Inversion Principle (DIP)** with a modular, plugin-based architecture.
+### 📊 Chart Types (4 Options)
 
-### UML Design Diagram
+1. **📈 Line Chart**
+   - Shows data trend over time
+   - Best for: Seeing patterns and trends
+   - Streamlit native
 
-View the complete system architecture in an interactive UML diagram:
+2. **📊 Area Chart**
+   - Filled line chart
+   - Best for: Highlighting magnitude
+   - Streamlit native
 
-👉 **[🏗️ View UML Architecture Diagram](./UMLDesign.html)** – Interactive diagram viewer with one-click PlantUML rendering
+3. **📉 Bar Chart**
+   - Discrete value bars
+   - Best for: Individual data points
+   - Streamlit native
 
-**How to use:**
-- **Open the file**:
-  - macOS: `open UMLDesign.html`
-  - Linux: `xdg-open UMLDesign.html`
-  - Windows: `start UMLDesign.html`
-- Click "📊 View in PlantUML Online" button
-- Code automatically copies to clipboard
-- Press **Ctrl+V** (Cmd+V on Mac) in PlantUML to paste and render diagram
+4. **🎯 Scatter Plot**
+   - Dots at exact positions
+   - Best for: Distribution analysis
+   - Streamlit native
 
-**View the UML code:**
-- 📄 **[design.uml](./docs/design.uml)** – Raw UML source code in PlantUML format
+### 📈 Real-time Statistics (9 Metrics)
 
-### Key Design Principles
+| Metric | Definition | Displayed |
+|--------|-----------|-----------|
+| **📍 Current** | Latest received value | Dynamic update |
+| **📊 Count** | Total packets received | Running counter |
+| **📈 Average** | Mean of all values | Recalculated per update |
+| **⬆️ Max** | Maximum value seen | Peak tracking |
+| **⬇️ Min** | Minimum value seen | Floor tracking |
+| **⏱️ Duration** | Time since stream started | Human-readable (Xh Ym or Xs) |
+| **📍 Points Buffered** | Current display buffer size | Max 200 by default |
+| **📏 Range** | Max - Min | Spread calculation |
+| **⚡ Data Rate** | Packets per second | Throughput metric |
 
-- **Dependency Inversion**: Core module owns Protocols; external modules implement them
-- **Structural Typing**: Uses Python `Protocol` for abstract interfaces (not inheritance)
-- **Dependency Injection**: Sinks injected into Engine at runtime
-- **Factory Pattern**: String-based driver mapping for flexible swapping
-- **Bootstrap Pattern**: Clear orchestration of component initialization
+### ⚙️ Configuration Management
 
-### System Flow
+**From GUI:**
+- Input Delay (milliseconds)
+- Core Parallelism (number of workers)
+- Stream Queue Size (buffer capacity)
+- Running Average Window
+- One-click Save/Reload
 
+**From config.json:**
+- Complete pipeline configuration
+- CSV schema mapping
+- Cryptographic parameters
+
+### 🎛️ Process Control
+
+**"🎯 Start Live Stream" Toggle:**
+- **Checked** → Starts pipeline + UDP listener
+- **Unchecked** → Stops both cleanly
+- Shows status: "Running (2h 15m)" or "Not running"
+- Auto-detects pipeline state
+
+### 🚀 Performance Settings
+
+**Refresh Rate Slider (10-100ms):**
+- **10ms**: Ultra-fast updates (hot)
+- **20ms**: Default (balanced)
+- **50ms**: Smooth (cool)
+- **100ms**: Very smooth (cooler)
+
+---
+
+## Data Flow & Queues
+
+### Queue Architecture
+
+#### Queue 1: Input → Core
 ```
-config.json
+CSV Row → GenericInputProducer → Packet {
+    _id: 1,
+    metric_value: 42.5,
+    security_hash: "abc123...",
+    ...
+} → Queue1 (maxsize=50)
+```
+
+#### Queue 2: Core → Agregator
+```
+Packet with isValid flag → CoreLogic validation → {
+    _id: 1,
+    metric_value: 42.5,
+    security_hash: "abc123...",
+    isValid: True  ← Added by CoreLogic
+} → Queue2 (maxsize=50)
+```
+
+#### Queue 3: Agregator → Output
+```
+Running average float (42.5) → Queue3 (maxsize=50)
+                          ↓
+                    ConsoleConsumer (prints)
+                    GUIConsumer (matplotlib)
+                    UDP Worker (→ Streamlit)
+```
+
+### Poison Pill Shutdown Pattern
+
+**Graceful cascade shutdown:**
+```
+GenericInputProducer finishes
     ↓
-bootstrap() [main.py]
-    ├─ Load config
-    ├─ Instantiate Output Sink (ConsoleWriter or GraphicsChartWriter)
-    ├─ Instantiate TransformationEngine (with injected sink)
-    ├─ Instantiate Input Driver (CsvReader or JsonReader)
-    ├─ Load raw data from file
-    └─ Execute engine.execute(raw_data, config)
-        └─ Pipeline runs 8 GDP analysis calculations
-            └─ Results written to sink (console or graphics)
+Puts None → Queue1
+    ↓
+CoreLogic reads None
+    ↓
+Puts None → Queue2
+    ↓
+Agregator reads None
+    ↓
+Puts None → Queue3
+    ↓
+UDP Worker reads None and exits
+    ↓
+All processes join()
 ```
 
 ---
 
-## Building Documentation
+## Configuration Reference
 
-The project includes **Sphinx-based HTML documentation** with auto-generated API reference.
-
-### Generate HTML Documentation
-
-```bash
-cd docs/
-make html
-```
-
-HTML files will be generated in `docs/build/html/`
-
-### View Documentation
-
-```bash
-# macOS
-open docs/build/html/index.html
-
-# Linux
-xdg-open docs/build/html/index.html
-
-# Windows
-start docs/build/html/index.html
-```
-
-### Documentation Structure
-
-- `docs/source/index.rst` - Main documentation index
-- `docs/source/modules.rst` - Module listing
-- `docs/source/core.rst` - Core module (engine, contracts, calculations)
-- `docs/source/plugins.rst` - Input/Output plugins
-- `docs/source/main.rst` - Main bootstrap entry point
-
-The Sphinx documentation auto-generates docstrings from the source code, so every module, class, and function has complete API documentation with examples.
-
----
-
-## Project Structure
-
-The project follows strict **Dependency Inversion Principle (DIP)** with clear separation of concerns:
-
-```
-SDA-Proj/
-├── main.py                          # Bootstrap orchestrator
-├── config.json                      # Configuration file
-│
-├── core/                            # Core module - CONTRACTS ONLY
-│   ├── contracts.py                 # DataSink & PipelineService protocols
-│   ├── engine.py                    # TransformationEngine (8 analyses)
-│   ├── cleaner_engine.py
-│   ├── melting_engine.py
-│   └── filter_engine.py
-│
-├── plugins/                         # Plugin modules - IMPLEMENTATION
-│   ├── inputs/                      # LEFT SIDE: Input Drivers
-│   │   ├── csv_reader.py           # CSV file loading
-│   │   └── json_reader.py          # JSON file loading
-│   │
-│   └── outputs/                     # RIGHT SIDE: Output Drivers + Visualization
-│       ├── console_writer.py        # Console output implementation
-│       ├── graphics_writer.py       # Dashboard implementation
-│       ├── dashboard.py             # Multi-page app framework
-│       └── graphs.py                # Visualization utilities
-│
-└── data/                            # Datasets
-    ├── gdp_with_continent_filled.csv
-    └── gdp_with_continent_filled.json
-```
-
-### DIP Architecture Breakdown
-
-| Component | Location | Role | Dependencies |
-|-----------|----------|------|--------------|
-| **Protocols** | `core/contracts.py` | Define interfaces | None (defines everything) |
-| **Engine** | `core/engine.py` | Business logic | Depends on protocols via injection |
-| **Input Plugins** | `plugins/inputs/` | Load data | Depend on input interface only |
-| **Output Plugins** | `plugins/outputs/` | Write results | Depend on DataSink protocol only |
-| **Bootstrap** | `main.py` | Orchestration | Connects everything without tight coupling |
-
-**Key Design Points:**
-- ✅ Core owns the protocols (not the other way around)
-- ✅ Plugins implement protocols, never touch core
-- ✅ Inputs and outputs are completely isolated on left/right sides
-- ✅ main.py is the only file that knows about all modules
-- ✅ Adding new driver requires NO changes to core or other plugins
-
----
-
-## Phase 2 Components
-
-### 1. Core Module: `core/contracts.py`
-
-**Purpose**: Define the abstract interfaces that the entire system depends on.
-
-**Key Protocols:**
-
-- **`DataSink`**: Outbound interface for writing analysis results
-  - Method: `write(records: List[dict], config: dict = None) -> None`
-  - Implemented by: `ConsoleWriter`, `GraphicsChartWriter`
-
-- **`PipelineService`**: Inbound interface for executing analysis
-  - Method: `execute(raw_data: List[Any], config_array: dict) -> None`
-  - Implemented by: `TransformationEngine`
-
-### 2. Core Module: `core/engine.py`
-
-**Purpose**: Orchestrate data transformation and analysis calculations.
-
-**Key Class:** `TransformationEngine`
-
-**Process:**
-1. Reshape raw data to long format
-2. Clean data (handle missing values, duplicates)
-3. Execute 8 GDP analysis calculations
-4. Wrap results with titles from config
-5. Send to injected sink for writing
-
-**8 Analysis Calculations:**
-1. `_calculate_growth_rate()` - GDP growth between years
-2. `_calculate_average_gdp_by_continent()` - Average GDP per continent
-3. `_calculate_global_gdp_trend()` - Total global GDP over time
-4. `_calculate_fastest_growing_continent()` - Which continent grew most
-5. `_calculate_countries_with_consistent_decline()` - Countries with declining GDP
-6. `_calculate_continent_contribution()` - Each continent's % of global GDP
-7. Plus: `top_10_gdp` and `bottom_10_gdp` (direct rankings)
-
-### 3. Plugins: Input Drivers
-
-**Location**: `plugins/inputs/`
-
-**Available Drivers:**
-- `CsvReader` (in `csv_reader.py`) - Load data from CSV file
-- `JsonReader` (in `json_reader.py`) - Load data from JSON file
-
-**Interface**: Both return raw data (pandas DataFrame) compatible with `TransformationEngine`
-
-### 4. Plugins: Output Drivers
-
-**Location**: `plugins/outputs/`
-
-**Available Drivers:**
-
-- **`ConsoleWriter`** (in `console_writer.py`) - Print results to console with formatted tables
-  - Handles DataFrames and dictionaries
-  - Clean, readable terminal output
-
-- **`GraphicsChartWriter`** (in `graphics_writer.py`) - Interactive 8-page dashboard
-  - Uses `DashboardApp` (in `dashboard.py`) for multi-page framework
-  - Uses `graphs.py` utilities for all visualizations
-  - Page 1: Top 10 Countries by GDP (bar chart)
-  - Page 2: Bottom 10 Countries by GDP (bar chart)
-  - Page 3: GDP Growth Rate by Country (bar chart)
-  - Page 4: Average GDP by Continent (donut chart)
-  - Page 5: Global GDP Trend (line chart)
-  - Page 6: Fastest Growing Continents (bar chart)
-  - Page 7: Countries with Consistent Decline (bar chart)
-  - Page 8: Continent Contribution (donut chart)
-  - Navigation: LEFT/RIGHT arrow keys
-
-### 5. Main Entry Point: `main.py`
-
-**Key Function:** `bootstrap()`
-
-**Orchestration Steps:**
-1. Load `config.json`
-2. Instantiate Output Sink based on `output_format` config
-3. Instantiate `TransformationEngine` with injected sink
-4. Instantiate Input Driver based on `input_format` config
-5. Load raw data from file
-6. Execute pipeline: `engine.execute(raw_data, config)`
-7. Display success/error messages
-
----
-
-## Configuration
-
-### Config File: `config.json`
+### `config.json` Structure
 
 ```json
 {
-  "input_format": "csv",
-  "filepath": "data/gdp_with_continent_filled.csv",
-  "output_format": "graphics",
-  "scope": "continent",
-  "region": "Africa",
-  "year": 2023,
-  "year_start": 2018,
-  "year_end": 2023,
-  "limit": 10,
-  "trend_window_years": 7,
-  "operation": "growth_rate"
+  "dataset_path": "data/sample_sensor_data.csv",
+
+  "schema_mapping": {
+    "_id": "_id",
+    "metric_value": "metric_value",
+    "security_hash": "security_hash"
+  },
+
+  "pipeline_dynamics": {
+    "input_delay_seconds": 0.01,
+    "core_parallelism": 2,
+    "stream_queue_max_size": 50
+  },
+
+  "processing": {
+    "stateless_tasks": {
+      "secret_key": "your-secret-key-here",
+      "iterations": 100000
+    },
+    "stateful_tasks": {
+      "running_average_window_size": 10
+    }
+  }
 }
 ```
 
 ### Configuration Parameters
 
-| Parameter | Type | Description | Example |
-|-----------|------|-------------|---------|
-| `input_format` | str | Input driver: "csv" or "json" | `"csv"` |
-| `filepath` | str | Path to data file | `"data/gdp_with_continent_filled.csv"` |
-| `output_format` | str | Output sink: "console" or "graphics" | `"graphics"` |
-| `region` | str | Region/continent to analyze | `"Africa"` |
-| `year` | int | Primary year for analysis | `2023` |
-| `year_start` | int | Start year for trends | `2018` |
-| `year_end` | int | End year for trends | `2023` |
-| `scope` | str | Scope of analysis | `"continent"` |
-| `limit` | int | Limit for rankings (e.g., top 10) | `10` |
-| `trend_window_years` | int | Years to look back for decline analysis | `7` |
-| `operation` | str | Aggregation operation | `"growth_rate"` |
-
-### Changing Configuration
-
-Simply edit `config.json` and re-run `python main.py`. All titles and parameters in the dashboard will automatically reflect the new config values (e.g., year ranges, region names).
-
-### ✅ Configuration Validation
-
-The application includes a **comprehensive two-level validation system** to prevent silent failures and catch configuration errors early:
-
-#### **Level 1: Early Validation** (Before Loading Data)
-Checked immediately after loading `config.json` to fail-fast on format errors:
-
-| Validation | Error Message | Example Fix |
-|-----------|---------------|------------|
-| **Input Format ↔ File Extension Match** | `❌ Input format 'csv' does not match file extension. File: data/gdp_with_continent_filled.json Expected: *.csv file` | Change `input_format` to `"json"` |
-| **File Exists** | `❌ File not found: data/invalid_file.csv` | Verify filepath is correct and file exists |
-| **Operation Valid** | `❌ Operation 'invalid_op' is not allowed. Valid operations: growth_rate` | Use only `"growth_rate"` |
-| **Limit is Positive Integer** | `❌ Limit must be a positive integer, got: -5` | Change to positive number (e.g., `10`) |
-| **Scope Valid** | `❌ Scope 'invalid' is invalid. Valid scopes: continent, country, year, global` | Use one of: `continent`, `country`, `year`, `global` |
-
-#### **Level 2: Data-Dependent Validation** (After Loading Data)
-Checked after loading the dataset to validate against actual data:
-
-| Validation | Error Message | Example Fix |
-|-----------|---------------|------------|
-| **Region Exists in Data** | `❌ Region 'ASjad Raza' not found in data. Valid regions: Africa, Asia, Europe, Global, North America, Oceania, South America` | Use valid region from list |
-| **Year Exists in Data** | `❌ Year 20202323 not found in data. Valid years: 1960 to 2024` | Use year between 1960-2024 |
-| **Year Range Valid** | `❌ Year range invalid: 20123238 to 20231323 Valid range: 1960 to 2024` | Use valid year range (e.g., `2018` to `2023`) |
-| **Trend Window Within Range** | `❌ Trend window years (100) exceeds available year range (64). Trend window years must be between 1 and 64` | Reduce `trend_window_years` to ≤ 64 |
-
-#### **Success Message**
-
-When all validations pass, you'll see:
-
-```
-✓ Configuration validated successfully
-  Region: Africa
-  Year: 2023
-  Year Range: 2018 to 2023
-  Operation: growth_rate
-  Limit: 10
-  Scope: continent
-  Trend Window: 5 years
-```
-
-#### **Why Two Levels?**
-
-- **Level 1** fails-fast on fixable errors (bad filename, typo in operation) without expensive data loading
-- **Level 2** validates against actual data (is this region in the dataset?) after the data is available
-- **Together** they prevent confusing errors and provide clear guidance on what's wrong
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dataset_path` | string | `data/sample_sensor_data.csv` | CSV file path |
+| `schema_mapping` | dict | See above | Maps CSV columns to internal names |
+| `input_delay_seconds` | float | 0.01 | Delay between reading rows (throttling) |
+| `core_parallelism` | int | 2 | Number of parallel core workers |
+| `stream_queue_max_size` | int | 50 | Max queue capacity before blocking |
+| `secret_key` | string | Required | PBKDF2 secret for signature validation |
+| `iterations` | int | 100000 | PBKDF2 iterations (cryptographic strength) |
+| `running_average_window_size` | int | 10 | Samples in running average window |
 
 ---
 
-## Extending the System
+## GUI Controls & Features
 
-### Adding a New Output Driver
+### Sidebar Sections
 
-1. Create class implementing `DataSink` protocol:
+#### 🎯 Pipeline Controls
+- **Start Live Stream** – Main toggle (checkbox)
+- Status indicator: Green/Red with uptime
+- Auto-manages pipeline process
 
-```python
-# In plugins/outputs.py
+#### 📡 Connection Status
+- Shows: "✓ Stream Active • Backend Running (2h 5m)"
+- Or: "⚠ Stream Active • Backend Starting..."
+- Or: "⊗ Stream Paused"
 
-class CustomWriter:
-    """Write results to custom format"""
+#### 📈 Display Settings
+- **Max data points to display**: Slider (10-200)
+- Prevents chart from becoming unwieldy
 
-    def write(self, records: Any, config: dict = None) -> None:
-        """Convert records to custom format and save"""
-        # Your implementation here
-        pass
+#### ⚡ Performance
+- **Refresh rate (milliseconds)**: Slider (10-100)
+- Lower = faster updates but more CPU
+- Higher = smoother but delayed updates
+
+#### ⚙️ Pipeline Configuration
+- **Advanced Settings** expander (collapsed by default)
+- Edit pipeline parameters:
+  - Input Delay
+  - Core Parallelism
+  - Stream Queue Size
+  - Running Average Window
+- **Save to config.json** button
+- **Reload from File** button
+- JSON summary display
+
+#### 📊 Chart Type
+- **Radio buttons** (non-editable):
+  - 📈 Line Chart
+  - 📊 Area Chart
+  - 📉 Bar Chart
+  - 🎯 Scatter Plot
+- Horizontal layout
+
+#### 💾 Data Management
+- **Export CSV** – Downloads data with timestamps
+- **Clear Data** – Resets buffer and counters
+
+### Main Content Area
+
+#### 📉 Live Sensor Data Chart
+- Selected chart type rendered
+- Updates every refresh_rate_ms
+- Shows last N points (from Display Settings)
+
+#### 📊 Real-time Statistics
+- 5 metrics in first row (Current, Count, Average, Max, Min)
+- 4 metrics in second row (Duration, Buffered, Range, Rate)
+- Grid layout with metric cards
+
+---
+
+## Troubleshooting Guide
+
+### Issue: "Port 5005 is busy"
+
+**Error:**
+```
+OSError: [Errno 48] Address already in use
 ```
 
-2. Register in `main.py`:
+**Solutions:**
+1. Kill existing process:
+   ```bash
+   lsof -ti:5005 | xargs kill -9
+   ```
+2. Change port in `app.py` line 242:
+   ```python
+   sock.bind(("127.0.0.1", 5006))  # New port
+   ```
 
-```python
-OUTPUT_DRIVERS = {
-    "console": ConsoleWriter,
-    "graphics": GraphicsChartWriter,
-    "custom": CustomWriter  # Add here
-}
+### Issue: Chart not updating
+
+**Symptoms:** Chart appears but stays static
+
+**Check:**
+1. Is pipeline running? (check console output)
+2. Are there valid signatures? (~1-2 packets should pass)
+3. Is refresh rate too high (100ms)?
+   - Try lowering to 20ms
+
+**Fix:**
+- Go to config.json
+- Verify `secret_key` matches your data
+- Lower `iterations` if signing too slow
+
+### Issue: No data appears in statistics
+
+**Symptoms:** All metrics show "---" or 0
+
+**Causes:**
+1. Pipeline not running
+2. No valid signatures in CSV
+3. Input delay too high
+
+**Check:**
+```bash
+# Terminal running main.py should show queue sizes
+(5, 2, 1)  ← Good: data flowing
+(0, 0, 0)  ← Bad: no data
 ```
 
-3. Use in config:
+### Issue: GUI freezes on startup
 
+**Symptoms:** Streamlit loads but nothing happens
+
+**Solutions:**
+1. Press Ctrl+C and restart
+2. Check if pipeline crashed:
+   ```bash
+   ps aux | grep main.py
+   ```
+3. Clear Streamlit cache:
+   ```bash
+   streamlit cache clear
+   ```
+
+### Issue: Config changes not applied
+
+**Symptoms:** Modified config.json but nothing changes
+
+**Solution:**
+1. Save config from GUI using "💾 Save to config.json"
+2. **OR** manually edit config.json and restart pipeline:
+   ```bash
+   # Terminal 1: Stop main.py with Ctrl+C
+   # Then: python main.py
+   ```
+3. GUI doesn't need restart (auto-detects new config)
+
+---
+
+## Advanced Topics
+
+### Understanding PBKDF2 Validation
+
+**Why only ~1-2 packets pass?**
+
+PBKDF2 validation is **intentionally strict** for this demo:
+- Signature computed with 100,000+ iterations
+- Most random data doesn't match
+- Only specially-crafted packets pass
+- This is cryptographic filtering by design
+
+**To create valid packets:**
+```python
+from core.hash_function import generate_signature
+
+secret_key = "your-secret-key"
+metric_value = "42.5"
+hash_result = generate_signature(metric_value, secret_key, iterations=100000)
+# Use hash_result in CSV's security_hash column
+```
+
+### Extending the Pipeline
+
+#### Add New Chart Type
+
+Edit `app.py` around line 540:
+
+```python
+elif '🎭 New Chart' in chart_type_selected:
+    # Your custom rendering code
+    st.write("Custom chart here")
+```
+
+#### Adjust Cryptographic Strength
+
+Edit `config.json`:
 ```json
 {
-  "output_format": "custom"
+  "processing": {
+    "stateless_tasks": {
+      "iterations": 50000  # Lower = faster but weaker
+    }
+  }
 }
 ```
 
-### Adding a New Input Driver
+#### Change Queue Sizes
 
-1. Create class implementing the input interface:
-
-```python
-# In plugins/inputs.py
-
-class XmlReader:
-    """Load data from XML file"""
-
-    def __init__(self, filepath: str):
-        # Load and parse XML, return compatible format
-        pass
-```
-
-2. Register in `main.py`:
-
-```python
-INPUT_DRIVERS = {
-    "csv": CsvReader,
-    "json": JsonReader,
-    "xml": XmlReader  # Add here
-}
-```
-
-3. Use in config:
-
+Edit `config.json`:
 ```json
 {
-  "input_format": "xml",
-  "filepath": "data/gdp_data.xml"
+  "pipeline_dynamics": {
+    "stream_queue_max_size": 100  # Larger buffer
+  }
 }
 ```
 
-### Adding a New Calculation
+### Performance Tuning
 
-1. Add method to `TransformationEngine`:
+| Setting | Impact | Notes |
+|---------|--------|-------|
+| `core_parallelism` | Throughput ↑ | More workers = more parallelism |
+| `stream_queue_max_size` | Memory ↑ | Larger queue = can buffer more |
+| `input_delay_seconds` | Throughput ↓ | Lower = faster CSV reading |
+| `running_average_window_size` | Smoothness ↑ | Larger window = smoother avg |
+| GUI `Refresh rate` | CPU ↑ | Lower = more frequent updates |
 
-```python
-def _calculate_my_analysis(self, df, config_param1, config_param2):
-    """Calculate custom analysis"""
-    # Your logic here
-    return result_dataframe
+### Multiprocessing Details
+
+**Why multiprocessing?**
+- CPU-bound crypto validation
+- GIL bypass for true parallelism
+- N workers process simultaneously
+
+**Process Architecture:**
 ```
-
-2. Call it in `execute()`:
-
-```python
-my_result = self._calculate_my_analysis(df_clean, param1, param2)
-
-ret_data = {
-    # ... existing results ...
-    "my_analysis": build_result(
-        f"My Analysis ({param1}-{param2})",
-        my_result
-    )
-}
-```
-
-3. Add visualization to `GraphicsChartWriter`:
-
-```python
-def _graph_my_analysis(self, df: pd.DataFrame, ax) -> None:
-    """Visualize my analysis"""
-    # Your plotting code here
-    ax.plot(...)
-```
-
-4. Add page to dashboard:
-
-```python
-if 'my_analysis' in data_dict and not data_dict['my_analysis']['data'].empty:
-    p9 = self.app.add_new_page(data_dict['my_analysis'].get("title"))
-    self.app.add_element(p9, self._graph_my_analysis, data_dict['my_analysis'].get("data"))
+Parent (main.py)
+├── Child 1: GenericInputProducer (reads CSV)
+├── Child 2: CoreLogic (validates packet 1)
+├── Child 3: CoreLogic (validates packet 2)  ← Parallel
+├── Child 4: Agregator (orders + averages)
+└── Child 5: Telemetry (monitors)
 ```
 
 ---
 
-## Troubleshooting
+## Summary
 
-### Error: "FileNotFoundError: config.json not found"
+**SDA Phase 3** demonstrates:
+- ✅ Real-time data streaming with multiprocessing
+- ✅ Cryptographic data validation at scale
+- ✅ Order preservation in distributed system
+- ✅ Web-based GUI with process control
+- ✅ Configuration-driven architecture
+- ✅ Observer pattern telemetry
+- ✅ Graceful shutdown with poison pills
 
-**Cause**: Running from wrong directory
-
-**Solution**:
-```bash
-cd /Users/asjadraza/SDA-Proj
-python main.py
-```
-
----
-
-### Error: "Unknown input format: xyz"
-
-**Cause**: `input_format` in config doesn't match a registered driver
-
-**Solution**:
-1. Check `INPUT_DRIVERS` dict in `main.py`
-2. Use one of: `"csv"`, `"json"`
-3. Or add custom driver (see Extending section)
+Built for educational understanding of production pipeline patterns.
 
 ---
 
-### Error: "Unknown output format: xyz"
-
-**Cause**: `output_format` in config doesn't match a registered sink
-
-**Solution**:
-1. Check `OUTPUT_DRIVERS` dict in `main.py`
-2. Use one of: `"console"`, `"graphics"`
-3. Or add custom driver (see Extending section)
-
----
-
-### Error: "FileNotFoundError: data file not found"
-
-**Cause**: `filepath` in config.json is incorrect
-
-**Solution**:
-1. Check file exists: `ls data/gdp_with_continent_filled.csv`
-2. Update `filepath` in config.json to correct path
-3. Use absolute or relative path from project root
-
----
-
-### Dashboard doesn't display
-
-**Cause**: Running in an environment without GUI support (e.g., SSH without X11)
-
-**Solution**:
-1. Use `"output_format": "console"` instead of `"graphics"` in config.json
-2. Or forward X11 display if using SSH
-3. Or save plots to file (extend `GraphicsChartWriter` to support this)
-
----
-
-## For Complete API Reference
-
-**Please refer to the Sphinx documentation** by running:
-
-```bash
-cd docs/
-make html
-open docs/build/html/index.html
-```
-
-The HTML documentation includes:
-- All module docstrings
-- Complete function signatures
-- Parameter descriptions
-- Return value documentation
-- Usage examples
-
----
-
-**Last Updated**: Phase 2 (Modular Orchestration & Dependency Inversion)
+**Last Updated:** March 23, 2026
