@@ -124,13 +124,14 @@
         }
 
         .copy-btn {
-            padding: 8px 16px;
+            padding: 10px 20px;
             background: #667eea;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-weight: 600;
+            font-size: 1em;
             margin-bottom: 10px;
             transition: all 0.3s ease;
         }
@@ -251,14 +252,15 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏗️ SDA Project Phase 2</h1>
-            <p>GDP Analysis Tool - UML Architecture Diagram</p>
+            <h1>🏗️ SDA Project Phase 3</h1>
+            <p>Sensor Pipeline Architecture - UML Architecture Diagram</p>
         </div>
 
         <div class="content">
             <div class="info-box">
-                Your <code>design.uml</code> file is ready! Use one of the online editors below to view the diagram.
-                Just click the button and the code will be automatically loaded.
+                The UML Diagram code is automatically copied to your clipboard.
+                Use one of the online editors below and paste it to view the diagram.
+                You can find the code in <code>docs/design.uml</code> in the project directory as well.
             </div>
 
             <div class="button-group">
@@ -277,44 +279,16 @@
                 <a href="https://app.diagrams.net/" target="_blank">Diagrams.net</a>
             </div>
 
-            <h2 style="margin-top: 30px; margin-bottom: 20px; color: #333;">📝 Steps to View Your Diagram:</h2>
-
-            <div class="step">
-                <strong>Step 1:</strong> Click "View in PlantUML Online" button above (opens in new tab)
-            </div>
-
-            <div class="step">
-                <strong>Step 2:</strong> The diagram code should load automatically in the editor
-            </div>
-
-            <div class="step">
-                <strong>Step 3:</strong> If not, manually copy the code below and paste it in the editor
-            </div>
-
-            <div class="step">
-                <strong>Step 4:</strong> The UML diagram will render with all architecture elements:
-                <ul style="margin-left: 20px; margin-top: 10px;">
-                    <li>Main Module (bootstrap orchestrator)</li>
-                    <li>Core Module (protocols & engine)</li>
-                    <li>Input Plugins (CSV & JSON readers)</li>
-                    <li>Output Plugins (Console & Graphics writers)</li>
-                    <li>Dependency injection flows</li>
-                </ul>
-            </div>
-
             <h2 style="margin-top: 30px; margin-bottom: 15px; color: #333;">📄 UML Code (design.uml):</h2>
 
-            <button class="copy-btn" onclick="copyCode()">Copy All Code</button>
+            <button class="copy-btn" onclick="copyCode()">Copy All Code (incase auto copy didn't work)</button>
             <div class="copy-feedback" id="copyFeedback">✓ Code copied to clipboard!</div>
 
             <div class="code-box">
                 <textarea id="umlCode"
-                    style="width: 100%; height: 600px; border: none; background: transparent; font-family: 'Courier New', monospace; font-size: 0.9em; resize: none; color: #333;">@startuml
+                    style="width: 100%; height: 600px; border: none; background: transparent; font-family: 'Courier New', monospace; font-size: 0.9em; resize: none; color: #333;">@startuml SDA_Phase3
 
-' =========================
-' Layout & Global Styling
-' =========================
-left to right direction
+top to bottom direction
 skinparam backgroundColor #F9FAFB
 skinparam shadowing false
 skinparam classAttributeIconSize 0
@@ -323,140 +297,245 @@ skinparam class {
     BackgroundColor #FFFFFF
     BorderColor #1F2937
     ArrowColor #374151
-    FontName Segoe UI
-    FontSize 12
+    FontName "Segoe UI"
 }
 
-skinparam package {
-    BackgroundColor #E5E7EB
-    BorderColor #374151
-}
+title SDA Phase 3 - Sensor Pipeline Architecture
 
-skinparam stereotypeCBackgroundColor #DBEAFE
-skinparam stereotypeCBorderColor #1D4ED8
-
-title GDP Analysis Tool - Layered Plugin Architecture
-
-' =========================
-' Application Layer
-' =========================
-package "Application Layer" {
-
-    class Main <<EntryPoint>> {
-        + bootstrap()
-        + loadConfig()
-    }
-}
-
-' =========================
-' Core Layer
-' =========================
-package "Core" {
-
-    interface DataSource <<PipelineService>> {
-        + read(filepath: str)
+' ENTRY POINT
+package "main.py" {
+    class Pipeline {
+        input_producer
+        core
+        telemetry_proc
+        agg_process
+        gui_process
+        --
+        bootstrap()
+        validate_config()
+        init_queues()
+        run_input()
+        run_core()
+        run_agregate()
+        run_telemetry()
+        run_output()
     }
 
-    interface DataSink <<PipelineService>> {
-        + write(records, config)
-    }
-
-    class Engine <<Core>> {
-        + execute(data, config)
-    }
-
-    class CleanerEngine <<Core>>
-    class FilterEngine <<Core>>
-    class MeltingEngine <<Core>>
-
-    Engine --> CleanerEngine
-    Engine --> FilterEngine
-    Engine --> MeltingEngine
-}
-
-' =========================
-' Input Plugins
-' =========================
-package "Plugins - Input" {
-
-    class CsvReader <<Plugin>> {
-        + read(filepath: str)
-    }
-
-    class JsonReader <<Plugin>> {
-        + read(filepath: str)
+    class Observer_Telemetry {
+        update(data)
     }
 }
 
-' =========================
-' Output Plugins
-' =========================
-package "Plugins - Output" {
-
-    class ConsoleWriter <<Plugin>> {
-        + write(records, config)
-        - _write_dict()
-        - _write_list()
+' INPUT LAYER
+package "plugins/inputs" {
+    class GenericInputProducer {
+        queue
+        schema_mapping
+        input_delay
+        schema_mapper
+        --
+        run(dataset_path)
     }
 
-    class GraphicsChartWriter <<Plugin>> {
-        - save_path
-        - app: DashboardApp
-        + write(records, config)
-        - _create_dashboard()
+    class SchemaMapper {
+        schema_mapping
+        --
+        map_row(row)
     }
 
-    class DashboardApp <<VisualizationEngine>> {
-        - pages
-        - current_page_idx
-        - fig
-        + add_new_page(title)
-        + add_element(page, func)
-        + run()
+    class InputValidator {
+        config
+        --
+        validate_all()
     }
 }
 
-' =========================
-' Relationships
-' =========================
+' CORE LAYER
+package "core" {
+    class CoreManager {
+        workers
+        input_queue
+        agg_queue
+        processes_arr
+        --
+        initialize_multiprocessing()
+        generate_worker()
+        shutdown_core()
+    }
 
-DataSource <|.. CsvReader
-DataSource <|.. JsonReader
+    class CoreLogic {
+        input_queue
+        output_queue
+        config
+        --
+        process()
+        _validate(packet)
+    }
 
-DataSink <|.. ConsoleWriter
-DataSink <|.. GraphicsChartWriter
+    class Agregator {
+        queue
+        output_queue
+        pq
+        deque
+        expected_id
+        --
+        agregate()
+        _generate_output(packet)
+    }
 
-Engine o-- DataSink : injected
-Engine ..> DataSource : uses
+    interface Observer {
+        update(data)
+    }
 
-Main ..> Engine : instantiates
-Main ..> DataSource : loads via config
-Main ..> DataSink : loads via config
+    class Telemetry {
+        input_queue
+        agregate_queue
+        output_queue
+        observers
+        stop_event
+        --
+        subscribe(observer)
+        notify()
+        poll(interval)
+        quit()
+    }
+}
 
-GraphicsChartWriter *-- DashboardApp
+' OUTPUT LAYER
+package "plugins/outputs" {
+    abstract class BaseOutputConsumer {
+        output_queue
+        config
+        --
+        consume()
+    }
 
-' =========================
-' Legend
-' =========================
-legend right
-  <<EntryPoint>> Application bootstrap
-  <<Core>> Business logic layer
-  <<PipelineService>> Core pipeline interface
-  <<Plugin>> Extensible implementation
-  <<VisualizationEngine>> UI rendering engine
-end legend
+    class ConsoleConsumer {
+        consume()
+    }
+
+    class GUIConsumer {
+        dashboard
+        --
+        consume()
+    }
+
+    class DashboardApp {
+        pages
+        current_page_idx
+        fig
+        --
+        add_new_page(title)
+        add_element(page, func)
+        run()
+    }
+}
+
+' STREAMLIT GUI
+package "app.py" {
+    class StreamlitApp {
+        socket
+        data_list
+        timestamps
+        pipeline_process
+        --
+        load_config()
+        save_config(config)
+        start_pipeline()
+        stop_pipeline()
+        listen_on_udp()
+        render_charts()
+        render_statistics()
+    }
+}
+
+' CONFIGURATION
+package "config.json" {
+    class Config {
+        schema_mapping
+        pipeline_dynamics
+        processing
+        dataset_path
+    }
+}
+
+' ORCHESTRATION
+Pipeline --> GenericInputProducer
+Pipeline --> CoreManager
+Pipeline --> Agregator
+Pipeline --> Telemetry
+Pipeline --> StreamlitApp
+Pipeline --> InputValidator
+Pipeline --> Config
+
+' INPUT CHAIN
+GenericInputProducer --> SchemaMapper
+GenericInputProducer --> Config
+
+' CORE CHAIN
+CoreManager --> CoreLogic
+CoreLogic --> Config
+Telemetry --> Observer
+Observer_Telemetry ..|> Observer
+
+' AGREGATION
+Agregator --> Config
+
+' OUTPUT CHAIN
+ConsoleConsumer --|> BaseOutputConsumer
+GUIConsumer --|> BaseOutputConsumer
+GUIConsumer --> DashboardApp
+
+' DATA FLOW
+GenericInputProducer --> CoreLogic : Queue1
+CoreLogic --> Agregator : Queue2
+Agregator --> ConsoleConsumer : Queue3
+Agregator --> GUIConsumer : Queue3
+Agregator --> StreamlitApp : UDP
+
+' MONITORING
+Telemetry --> GenericInputProducer : monitor
+Telemetry --> CoreLogic : monitor
+Telemetry --> Agregator : monitor
+
+' GUI CONTROL
+StreamlitApp ..> Pipeline : control
+
+note right of Pipeline
+  Orchestrates all processes
+  Manages graceful shutdown
+end note
+
+note right of CoreLogic
+  PBKDF2 HMAC SHA-256
+  Signature validation
+  ~1-2 packets pass
+end note
+
+note right of Agregator
+  Priority queue ordering
+  Running average window
+  Out-of-order handling
+end note
+
+note right of StreamlitApp
+  Dark dashboard UI
+  4 chart types
+  9 real-time metrics
+  Config management
+  Process control
+end note
 
 @enduml</textarea>
             </div>
 
             <div class="info-box" style="margin-top: 30px;">
-                <strong>💡 Pro Tip:</strong> You can also save this diagram as PNG/SVG in most online editors. This is
-                great for including in presentations or documentation!
+                <strong>💡</strong> You can also save this diagram as PNG/SVG in most online editors.
             </div>
         </div>
 
         <div class="footer">
-            SDA Project Phase 2 | Dependency Inversion Principle Architecture | March 2026
+            SDA Project Phase 3 | Sensor Pipeline Architecture | April 2026
         </div>
     </div>
 

@@ -1,8 +1,5 @@
-@startuml SDA_Phase3_Architecture
+@startuml SDA_Phase3
 
-' =========================
-' Layout & Global Styling
-' =========================
 top to bottom direction
 skinparam backgroundColor #F9FAFB
 skinparam shadowing false
@@ -12,331 +9,233 @@ skinparam class {
     BackgroundColor #FFFFFF
     BorderColor #1F2937
     ArrowColor #374151
-    FontName Segoe UI
-    FontSize 11
+    FontName "Segoe UI"
 }
 
-skinparam package {
-    BackgroundColor #E5E7EB
-    BorderColor #374151
-}
+title SDA Phase 3 - Sensor Pipeline Architecture
 
-skinparam stereotypeCBackgroundColor #DBEAFE
-skinparam stereotypeCBorderColor #1D4ED8
-
-title SDA Phase 3 - Real-time Sensor Data Pipeline\nMultiprocessing Architecture with Crypto Verification
-
-' =========================
-' Entry Point
-' =========================
-package "Application" {
-    class main <<EntryPoint>> {
-        + Bootstrap pipeline
-        + Load config.json
-        + Handle graceful shutdown
-    }
-
-    class Pipeline <<Orchestrator>> {
-        - config: dict
-        - input_queue: Queue
-        - agregator_queue: Queue
-        - output_queue: Queue
-        + bootstrap()
-        + validate_config()
-        + init_queues()
-        + run_input()
-        + run_core()
-        + run_agregate()
-        + run_telemetry()
-        + run_output()
-        + shutdown_all()
-    }
-
-    main --> Pipeline
-}
-
-' =========================
-' Input Layer
-' =========================
-package "Input Module (plugins/inputs)" {
-
-    class GenericInputProducer <<Producer>> {
-        - queue: Queue
-        - schema_mapping: dict
-        - input_delay: float
+' ENTRY POINT
+package "main.py" {
+    class Pipeline {
+        input_producer
+        core
+        telemetry_proc
+        agg_process
+        gui_process
         --
-        + run(dataset_path)
-        - _read_csv()
-        - _send_to_queue()
+        bootstrap()
+        validate_config()
+        init_queues()
+        run_input()
+        run_core()
+        run_agregate()
+        run_telemetry()
+        run_output()
     }
 
-    class SchemaMapper <<Transformer>> {
-        - schema_mapping: dict
-        --
-        + map_row(row: dict)
-        + validate_mapping()
-        - _cast_types()
-    }
-
-    class InputValidator <<Validator>> {
-        - config: dict
-        --
-        + validate_all()
-        - validate_schema_mapping()
-        - validate_pipeline_dynamics()
-    }
-
-    GenericInputProducer --> SchemaMapper
-    GenericInputProducer --> InputValidator
-}
-
-' =========================
-' Core Processing Layer
-' =========================
-package "Core Processing (core/)" {
-
-    class CoreManager <<ProcessManager>> {
-        - workers: int
-        - input_queue: Queue
-        - output_queue: Queue
-        - worker_processes: list
-        --
-        + initialize_multiprocessing()
-        + shutdown_core()
-        - _create_workers()
-    }
-
-    class CoreLogic <<BusinessLogic>> {
-        - input_queue: Queue
-        - output_queue: Queue
-        - config: dict
-        --
-        + process()
-        - _validate(packet)
-        + Validates PBKDF2 signature
-    }
-
-    class Agregator <<Aggregator>> {
-        - queue: Queue
-        - output_queue: Queue
-        - pq: PriorityQueue (heapq)
-        - deque: deque(maxlen)
-        - expected_id: int
-        --
-        + agregate()
-        - _generate_output(packet)
-        + Maintains packet order
-        + Calculates running average
-    }
-
-    class HashFunction <<SecurityModule>> {
-        --
-        + validate_signature(hash, value, key, iter)
-        + Uses PBKDF2 HMAC SHA-256
-    }
-
-    CoreManager --> CoreLogic
-    CoreLogic --> HashFunction
-    CoreManager --> Agregator
-}
-
-' =========================
-' Telemetry & Observer
-' =========================
-package "Telemetry & Monitoring (core/)" {
-
-    interface Observer <<Pattern>> {
-        + update(data)
-    }
-
-    class Telemetry <<MonitoringService>> {
-        - input_queue: Queue
-        - agregator_queue: Queue
-        - output_queue: Queue
-        - observers: list[Observer]
-        - stop_event: Event
-        --
-        + subscribe(observer)
-        + notify()
-        + poll(interval)
-        + quit()
-        - get_data()
-        + Reports queue sizes as tuples
-    }
-
-    class Observer_Telemetry <<ConcreteObserver>> {
-        --
-        + update(data)
-        + Prints queue sizes to console
-    }
-
-    Telemetry --> Observer
-    Observer_Telemetry ..|> Observer
-}
-
-' =========================
-' Configuration
-' =========================
-package "Configuration" {
-    class Config <<DataHolder>> {
-        + schema_mapping: dict
-        + pipeline_dynamics: object
-          - input_delay_seconds: float
-          - core_parallelism: int
-          - stream_queue_max_size: int
-        + processing: object
-          - stateless_tasks: object
-            - secret_key: str
-            - iterations: int
-          - stateful_tasks: object
-            - running_average_window_size: int
-        + dataset_path: str
+    class Observer_Telemetry {
+        update(data)
     }
 }
 
-' =========================
-' Output Layer
-' =========================
-package "Output Layer" {
-
-    class UDPWorker <<OutputService>> {
-        - output_queue: Queue
-        - socket: UDP
-        - address: (IP, PORT)
+' INPUT LAYER
+package "plugins/inputs" {
+    class GenericInputProducer {
+        queue
+        schema_mapping
+        input_delay
+        schema_mapper
         --
-        + send_float_values()
-        + Sends running averages to 127.0.0.1:5005
+        run(dataset_path)
     }
 
-    class StreamlitGUI <<WebApplication>> {
-        - socket: UDP listener
-        - data_list: list
-        - timestamps: list
+    class SchemaMapper {
+        schema_mapping
         --
-        + listen_on_udp()
-        + render_charts()
-        + render_statistics()
-        + manage_process()
+        map_row(row)
+    }
+
+    class InputValidator {
+        config
+        --
+        validate_all()
     }
 }
 
-' =========================
-' Data Flow
-' =========================
-package "Inter-Process Communication" {
-    class Queue1 <<IPC>> {
-        + Bounded queue (max_size)
-        + CSV rows → Core workers
+' CORE LAYER
+package "core" {
+    class CoreManager {
+        workers
+        input_queue
+        agg_queue
+        processes_arr
+        --
+        initialize_multiprocessing()
+        generate_worker()
+        shutdown_core()
     }
 
-    class Queue2 <<IPC>> {
-        + Bounded queue (max_size)
-        + Core output → Agregator
+    class CoreLogic {
+        input_queue
+        output_queue
+        config
+        --
+        process()
+        _validate(packet)
     }
 
-    class Queue3 <<IPC>> {
-        + Bounded queue (max_size)
-        + Agregator output → UDP worker
+    class Agregator {
+        queue
+        output_queue
+        pq
+        deque
+        expected_id
+        --
+        agregate()
+        _generate_output(packet)
+    }
+
+    interface Observer {
+        update(data)
+    }
+
+    class Telemetry {
+        input_queue
+        agregate_queue
+        output_queue
+        observers
+        stop_event
+        --
+        subscribe(observer)
+        notify()
+        poll(interval)
+        quit()
     }
 }
 
-' =========================
-' Relationships
-' =========================
+' OUTPUT LAYER
+package "plugins/outputs" {
+    abstract class BaseOutputConsumer {
+        output_queue
+        config
+        --
+        consume()
+    }
 
-' Pipeline orchestration
-Pipeline --> GenericInputProducer: spawns
-Pipeline --> CoreManager: spawns
-Pipeline --> Agregator: spawns
-Pipeline --> Telemetry: spawns
-Pipeline --> UDPWorker: spawns
+    class ConsoleConsumer {
+        consume()
+    }
 
-' Queue connections
-GenericInputProducer --> Queue1: writes
-Queue1 --> CoreLogic: reads
-CoreLogic --> Queue2: writes
-Queue2 --> Agregator: reads
-Agregator --> Queue3: writes
-Queue3 --> UDPWorker: reads
+    class GUIConsumer {
+        dashboard
+        --
+        consume()
+    }
 
-' Monitoring
-Telemetry --> Queue1: monitors
-Telemetry --> Queue2: monitors
-Telemetry --> Queue3: monitors
-Telemetry --> Observer_Telemetry: notifies
+    class DashboardApp {
+        pages
+        current_page_idx
+        fig
+        --
+        add_new_page(title)
+        add_element(page, func)
+        run()
+    }
+}
 
-' Configuration
-Pipeline --> Config: loads
-GenericInputProducer --> Config: reads
-CoreLogic --> Config: reads
-Agregator --> Config: reads
+' STREAMLIT GUI
+package "app.py" {
+    class StreamlitApp {
+        socket
+        data_list
+        timestamps
+        pipeline_process
+        --
+        load_config()
+        save_config(config)
+        start_pipeline()
+        stop_pipeline()
+        listen_on_udp()
+        render_charts()
+        render_statistics()
+    }
+}
 
-' GUI
-UDPWorker --> StreamlitGUI: sends data
-StreamlitGUI ..> Pipeline: starts/stops
+' CONFIGURATION
+package "config.json" {
+    class Config {
+        schema_mapping
+        pipeline_dynamics
+        processing
+        dataset_path
+    }
+}
 
-' =========================
-' Process States
-' =========================
+' ORCHESTRATION
+Pipeline --> GenericInputProducer
+Pipeline --> CoreManager
+Pipeline --> Agregator
+Pipeline --> Telemetry
+Pipeline --> StreamlitApp
+Pipeline --> InputValidator
+Pipeline --> Config
+
+' INPUT CHAIN
+GenericInputProducer --> SchemaMapper
+GenericInputProducer --> Config
+
+' CORE CHAIN
+CoreManager --> CoreLogic
+CoreLogic --> Config
+Telemetry --> Observer
+Observer_Telemetry ..|> Observer
+
+' AGREGATION
+Agregator --> Config
+
+' OUTPUT CHAIN
+ConsoleConsumer --|> BaseOutputConsumer
+GUIConsumer --|> BaseOutputConsumer
+GUIConsumer --> DashboardApp
+
+' DATA FLOW
+GenericInputProducer --> CoreLogic : Queue1
+CoreLogic --> Agregator : Queue2
+Agregator --> ConsoleConsumer : Queue3
+Agregator --> GUIConsumer : Queue3
+Agregator --> StreamlitApp : UDP
+
+' MONITORING
+Telemetry --> GenericInputProducer : monitor
+Telemetry --> CoreLogic : monitor
+Telemetry --> Agregator : monitor
+
+' GUI CONTROL
+StreamlitApp ..> Pipeline : control
+
 note right of Pipeline
-    **Multiprocessing Architecture:**
-    - Input Producer (1 process)
-    - Core Workers (N processes)
-    - Agregator (1 process)
-    - Telemetry (1 process)
-    - UDP Worker (1 process)
-    - Streamlit App (separate terminal)
-
-    **Shutdown Pattern (Poison Pill):**
-    - None sentinel signals EOF
-    - Graceful cascade shutdown
+  Orchestrates all processes
+  Manages graceful shutdown
 end note
 
 note right of CoreLogic
-    **Signature Validation:**
-    - PBKDF2 HMAC SHA-256
-    - Only ~1-2 packets pass (intentional)
-    - Invalid packets silently skipped
+  PBKDF2 HMAC SHA-256
+  Signature validation
+  ~1-2 packets pass
 end note
 
 note right of Agregator
-    **Order Maintenance:**
-    - Priority queue by packet ID
-    - Running average with deque
-    - Reorders out-of-order packets
+  Priority queue ordering
+  Running average window
+  Out-of-order handling
 end note
 
-note right of StreamlitGUI
-    **GUI Features:**
-    - Dark theme with gradients
-    - 5 chart types (Line, Area, Bar, Scatter, Combined)
-    - 9 real-time statistics
-    - Config UI for pipeline settings
-    - Process start/stop controls
-    - Data export & clear functions
-    - Refresh rate slider (10-100ms)
+note right of StreamlitApp
+  Dark dashboard UI
+  4 chart types
+  9 real-time metrics
+  Config management
+  Process control
 end note
-
-' =========================
-' Legend
-' =========================
-legend right
-    ||<<EntryPoint>>||Main application entry||
-    ||<<Orchestrator>>||Manages entire pipeline||
-    ||<<Producer>>||Reads external data||
-    ||<<Transformer>>||Transforms data structure||
-    ||<<Validator>>||Validates configuration||
-    ||<<ProcessManager>>||Manages worker processes||
-    ||<<BusinessLogic>>||Core processing logic||
-    ||<<Aggregator>>||Aggregates processed data||
-    ||<<SecurityModule>>||Cryptographic operations||
-    ||<<Pattern>>||Design pattern interface||
-    ||<<MonitoringService>>||Observes system state||
-    ||<<ConcreteObserver>>||Implements observer||
-    ||<<OutputService>>||Outputs data||
-    ||<<WebApplication>>||GUI interface||
-    ||<<IPC>>||Inter-process queue||
-    ||<<DataHolder>>||Configuration object||
-end legend
 
 @enduml
