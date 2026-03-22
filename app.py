@@ -160,20 +160,20 @@ def create_scatter_plot(data):
     })
     return st.scatter_chart(df.set_index('Index')[['Value']], use_container_width=True)
 
-def create_combined_chart(data):
-    """Create a combined line + area chart using Plotly."""
-    fig = go.Figure()
+# def create_combined_chart(data):
+#     """Create a combined line + area chart using Plotly."""
+#     fig = go.Figure()
 
-    # Add area trace
-    fig.add_trace(go.Scatter(
-        y=data,
-        mode='lines',
-        name='Running Average',
-        fill='tozeroy',
-        line=dict(color='rgba(59, 130, 246, 0.8)', width=2),
-        fillcolor='rgba(59, 130, 246, 0.2)',
-        hovertemplate='<b>Value:</b> %{y:.4f}<extra></extra>'
-    ))
+#     # Add area trace
+#     fig.add_trace(go.Scatter(
+#         y=data,
+#         mode='lines',
+#         name='Running Average',
+#         fill='tozeroy',
+#         line=dict(color='rgba(59, 130, 246, 0.8)', width=2),
+#         fillcolor='rgba(59, 130, 246, 0.2)',
+#         hovertemplate='<b>Value:</b> %{y:.4f}<extra></extra>'
+#     ))
 
     # Styling
     fig.update_layout(
@@ -565,7 +565,7 @@ with st.sidebar:
             "📊 Area Chart",
             "📉 Bar Chart",
             "🎯 Scatter Plot",
-            "🔀 Combined (Line + Fill)"
+            # "🔀 Combined (Line + Fill)"
         ],
         horizontal=True,
         key="chart_type_selector"
@@ -833,32 +833,32 @@ if not run_streaming:
                     'Value': st.session_state.data_list
                 })
                 st.scatter_chart(df_scatter, x='Index', y='Value', use_container_width=True)
-            elif '🔀 Combined' in chart_type_selected:
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    y=st.session_state.data_list,
-                    mode='lines',
-                    name='Running Average',
-                    fill='tozeroy',
-                    line=dict(color='rgba(59, 130, 246, 0.8)', width=2),
-                    fillcolor='rgba(59, 130, 246, 0.2)',
-                    hovertemplate='<b>Value:</b> %{y:.4f}<extra></extra>'
-                ))
-                fig.update_layout(
-                    title='Live Sensor Data',
-                    xaxis_title='Sample #',
-                    yaxis_title='Value',
-                    template='plotly_dark',
-                    height=400,
-                    hovermode='x unified',
-                    margin=dict(l=50, r=50, t=50, b=50),
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(20, 30, 50, 0.3)',
-                    font=dict(color='white'),
-                    xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
-                    yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            # elif '🔀 Combined' in chart_type_selected:
+            #     fig = go.Figure()
+            #     fig.add_trace(go.Scatter(
+            #         y=st.session_state.data_list,
+            #         mode='lines',
+            #         name='Running Average',
+            #         fill='tozeroy',
+            #         line=dict(color='rgba(59, 130, 246, 0.8)', width=2),
+            #         fillcolor='rgba(59, 130, 246, 0.2)',
+            #         hovertemplate='<b>Value:</b> %{y:.4f}<extra></extra>'
+            #     ))
+            #     fig.update_layout(
+            #         title='Live Sensor Data',
+            #         xaxis_title='Sample #',
+            #         yaxis_title='Value',
+            #         template='plotly_dark',
+            #         height=400,
+            #         hovermode='x unified',
+            #         margin=dict(l=50, r=50, t=50, b=50),
+            #         paper_bgcolor='rgba(0,0,0,0)',
+            #         plot_bgcolor='rgba(20, 30, 50, 0.3)',
+            #         font=dict(color='white'),
+            #         xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
+            #         yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
+            #     )
+            #     st.plotly_chart(fig, use_container_width=True)
 
         # Show final statistics
         with stats_placeholder.container():
