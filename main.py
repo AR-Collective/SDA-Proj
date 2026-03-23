@@ -57,6 +57,8 @@ class Observer_Telemetry(Observer):
 class Pipeline:
     def __init__(self,config):
         self.config = config
+        self.manager = None  # Will be initialized in bootstrap
+
     def validate_config(self):
         validator = InputValidator(self.config)
         is_valid, message = validator.validate_all()
@@ -68,9 +70,12 @@ class Pipeline:
         return True
 
     def bootstrap(self):
+        # Initialize Manager FIRST for queue support on macOS
+        self.manager = mp.Manager()
+
         self.validate_config()
         self.queue_size = self.config["pipeline_dynamics"]["stream_queue_max_size"]
-        self.workers = self.config["pipeline_dynamics"]["core_parallelism"] 
+        self.workers = self.config["pipeline_dynamics"]["core_parallelism"]
 
         self.init_queues()
         self.run_input()
@@ -92,9 +97,10 @@ class Pipeline:
 
 
     def init_queues(self):
-        self.input_queue = mp.Queue(maxsize=self.queue_size)
-        self.agregator_queue = mp.Queue(maxsize=self.queue_size)
-        self.output_queue = mp.Queue(maxsize=self.queue_size)
+        # Use Manager queues instead of mp.Queue for macOS compatibility
+        self.input_queue = self.manager.Queue(maxsize=self.queue_size)
+        self.agregator_queue = self.manager.Queue(maxsize=self.queue_size)
+        self.output_queue = self.manager.Queue(maxsize=self.queue_size)
 
     def run_input(self):
 
