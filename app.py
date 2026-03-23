@@ -362,6 +362,17 @@ if "sock" not in st.session_state:
         st.error("❌ Port 5005 is busy. Make sure only one instance is running.")
         st.stop()
 
+# Telemetry socket (port 5006)
+if "telemetry_sock" not in st.session_state:
+    try:
+        telemetry_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        telemetry_sock.bind(("127.0.0.1", 5006))
+        telemetry_sock.settimeout(0.1)
+        st.session_state.telemetry_sock = telemetry_sock
+    except OSError:
+        st.warning("⚠️ Port 5006 is busy. Telemetry data will not be available.")
+        st.session_state.telemetry_sock = None
+
 # Initialize data structures
 if "data_list" not in st.session_state:
     st.session_state.data_list = []
@@ -375,6 +386,18 @@ if "start_time" not in st.session_state:
 if "packet_count" not in st.session_state:
     st.session_state.packet_count = 0
 
+if "last_data_time" not in st.session_state:
+    st.session_state.last_data_time = None
+
+# Telemetry data structures
+if "telemetry_data" not in st.session_state:
+    st.session_state.telemetry_data = {
+        "input_queue_size": 0,
+        "agregator_queue_size": 0,
+        "output_queue_size": 0,
+        "timestamp": time.time()
+    }
+
 # ============================================================
 # MAIN CONTENT AREA PLACEHOLDERS (created once)
 # ============================================================
@@ -384,6 +407,9 @@ chart_placeholder = st.empty()
 
 st.markdown("### 📊 Real-time Statistics")
 stats_placeholder = st.empty()
+
+st.markdown("### 🏥 Pipeline Health Dashboard")
+health_placeholder = st.empty()
 
 status_placeholder = st.empty()
 
@@ -395,7 +421,7 @@ with st.sidebar:
     st.divider()
 
     # Integrated Start Live Stream with process management
-    run_streaming = st.checkbox("🎯 Start Live Stream", value=False)
+    run_streaming = st.checkbox("🎯 Start Live Stream", value=False, key="stream_toggle")
 
     # Start/stop pipeline process based on checkbox state
     if run_streaming:
@@ -415,6 +441,11 @@ with st.sidebar:
                 st.error(f"❌ Failed to stop pipeline: {str(e)}")
 
         # Reset display state when stopping
+        st.session_state.data_list = []
+        st.session_state.timestamps = []
+        st.session_state.packet_count = 0
+        st.session_state.start_time = None
+        st.session_state.last_data_time = None
         with chart_placeholder.container():
             st.empty()
         with stats_placeholder.container():
@@ -448,7 +479,8 @@ with st.sidebar:
         min_value=10,
         max_value=200,
         value=50,
-        step=10
+        step=10,
+        key="max_points_slider"  # Prevent accidental reruns
     )
 
     st.divider()
@@ -461,8 +493,15 @@ with st.sidebar:
         max_value=100,
         value=20,
         step=5,
+        key="refresh_rate_slider",  # Prevent accidental reruns
         help="Lower = faster updates, Higher = smoother but slower"
     )
+
+    # Trim buffer if max_points changed
+    if st.session_state.data_list and len(st.session_state.data_list) > max_points:
+        excess = len(st.session_state.data_list) - max_points
+        st.session_state.data_list = st.session_state.data_list[excess:]
+        st.session_state.timestamps = st.session_state.timestamps[excess:]
 
     st.divider()
 
@@ -484,6 +523,7 @@ with st.sidebar:
                 value=config.get("pipeline_dynamics", {}).get("input_delay_seconds", 0.01),
                 step=0.001,
                 format="%.4f",
+                key="input_delay_input",
                 help="Delay between reading CSV rows"
             )
             config["pipeline_dynamics"]["input_delay_seconds"] = input_delay
@@ -495,6 +535,7 @@ with st.sidebar:
                 max_value=16,
                 value=config.get("pipeline_dynamics", {}).get("core_parallelism", 2),
                 step=1,
+                key="core_parallelism_input",
                 help="Number of parallel core workers"
             )
             config["pipeline_dynamics"]["core_parallelism"] = core_parallelism
@@ -505,6 +546,7 @@ with st.sidebar:
             max_value=200,
             value=config.get("pipeline_dynamics", {}).get("stream_queue_max_size", 50),
             step=5,
+            key="stream_queue_slider",
             help="Maximum size of the processing queue"
         )
         config["pipeline_dynamics"]["stream_queue_max_size"] = stream_queue
@@ -517,6 +559,7 @@ with st.sidebar:
             max_value=50,
             value=config.get("processing", {}).get("stateful_tasks", {}).get("running_average_window_size", 10),
             step=1,
+            key="window_size_slider",
             help="Sample window for running average calculation"
         )
         config["processing"]["stateful_tasks"]["running_average_window_size"] = window_size
@@ -621,7 +664,7 @@ while run_streaming:
                 parsed = json.loads(decoded)
                 val = float(parsed.get("Raw_Value", parsed.get("value", 0)))
             except:
-                continue
+                val = None
 
         # Initialize start time on first data
         if st.session_state.start_time is None:
@@ -631,13 +674,35 @@ while run_streaming:
         st.session_state.data_list.append(val)
         st.session_state.timestamps.append(datetime.now())
         st.session_state.packet_count += 1
+        st.session_state.last_data_time = time.time()  # Track when we last received data
 
         # Keep list size manageable
         if len(st.session_state.data_list) > max_points:
             st.session_state.data_list.pop(0)
             st.session_state.timestamps.pop(0)
 
-        # ========== DISPLAY CHART ==========
+    except (socket.timeout, BlockingIOError):
+        pass
+    except Exception as e:
+        pass
+
+    # ========== RECEIVE TELEMETRY DATA ==========
+    if st.session_state.telemetry_sock:
+        try:
+            telemetry_packet, _ = st.session_state.telemetry_sock.recvfrom(4096)
+            telemetry_decoded = telemetry_packet.decode("utf-8").strip()
+            telemetry_json = json.loads(telemetry_decoded)
+            st.session_state.telemetry_data = telemetry_json
+            # Debug: Show that telemetry is being received
+            # print(f"[Telemetry] Queue sizes - Input: {telemetry_json.get('input_queue_size')}, Agg: {telemetry_json.get('agregator_queue_size')}, Out: {telemetry_json.get('output_queue_size')}")
+        except (socket.timeout, BlockingIOError):
+            pass
+        except Exception as e:
+            # Telemetry receive errors are non-critical
+            pass
+
+    # ========== DISPLAY CHART ==========
+    if st.session_state.data_list:
         with chart_placeholder.container():
             chart_type_selected = st.session_state.get('chart_type_selector', '📈 Line Chart')
 
@@ -788,19 +853,70 @@ while run_streaming:
                         delta=None
                     )
 
+        # Check if data has timed out (no data for 2+ seconds)
+        time_since_last = None
+        if st.session_state.last_data_time is not None:
+            time_since_last = time.time() - st.session_state.last_data_time
+
         # ========== STATUS ==========
-        with status_placeholder.container():
-            st.success(f"✅ Live • Receiving: {val:.6f} • Buffer: {len(st.session_state.data_list)}/{max_points}")
-
-    except (socket.timeout, BlockingIOError):
-        with status_placeholder.container():
-            st.warning("⏳ Waiting for UDP packets on 127.0.0.1:5005...")
-
-    except Exception as e:
-        with status_placeholder.container():
-            st.error(f"❌ Error: {str(e)}")
+        # Show "Live" only if we have data AND received something in the last 2 seconds
+        if st.session_state.data_list and time_since_last is not None and time_since_last < 2.0:
+            with status_placeholder.container():
+                st.success(f"✅ Live • Receiving: {val:.6f} • Buffer: {len(st.session_state.data_list)}/{max_points}")
+        else:
+            # Show "Waiting" if no data or timeout occurred
+            with status_placeholder.container():
+                if st.session_state.data_list:
+                    st.warning("⏳ Data Stream Ended • No packets received for 2+ seconds")
+                else:
+                    st.warning("⏳ Waiting for UDP packets on 127.0.0.1:5005...")
 
     time.sleep(refresh_rate_ms / 1000)  # Convert milliseconds to seconds
+
+    # ========== HEALTH DASHBOARD (Outside loop for performance) ==========
+    # Render health dashboard using latest telemetry data
+    with health_placeholder.container():
+        telemetry = st.session_state.telemetry_data
+        input_q = telemetry.get("input_queue_size", 0)
+        agg_q = telemetry.get("agregator_queue_size", 0)
+        out_q = telemetry.get("output_queue_size", 0)
+
+        # Determine queue fill status
+        max_q_size = max_points
+        input_fill = min(100, (input_q / max_q_size * 100)) if max_q_size > 0 else 0
+        agg_fill = min(100, (agg_q / max_q_size * 100)) if max_q_size > 0 else 0
+        out_fill = min(100, (out_q / max_q_size * 100)) if max_q_size > 0 else 0
+
+        # Status badge
+        is_running = is_pipeline_running()
+        status_badge = "🟢 Healthy" if is_running else "🔴 Offline"
+
+        # Display status
+        col_status1, col_status2 = st.columns([1, 3])
+        with col_status1:
+            st.write(status_badge)
+        with col_status2:
+            st.write(f"Pipeline Status: {'Running' if is_running else 'Not Running'}")
+
+        st.divider()
+
+        # Display queues with progress bars
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("📥 Input Queue", f"{input_q}/{max_q_size}")
+            st.progress(int(input_fill) / 100, text=f"{input_fill:.0f}%")
+
+        with col2:
+            st.metric("⚙️ Aggregator Queue", f"{agg_q}/{max_q_size}")
+            st.progress(int(agg_fill) / 100, text=f"{agg_fill:.0f}%")
+
+        with col3:
+            st.metric("📤 Output Queue", f"{out_q}/{max_q_size}")
+            st.progress(int(out_fill) / 100, text=f"{out_fill:.0f}%")
+
+        # Last update timestamp
+        st.caption(f"Last update: {datetime.fromtimestamp(telemetry.get('timestamp', time.time())).strftime('%H:%M:%S.%f')[:-3]}")
 
 # ============================================================
 # PAUSED STATE

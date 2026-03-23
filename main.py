@@ -18,10 +18,11 @@ import subprocess
 import time
 import socket
 
-# Create a UDP socket
+# Create UDP sockets for sensor data and telemetry
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
+TELEMETRY_PORT = 5006
 
 def worker(output_queue):
     while True:
@@ -31,9 +32,27 @@ def worker(output_queue):
         time.sleep(0.1)
         message = json.dumps(data).encode('utf-8')
         sock.sendto(message, (UDP_IP, UDP_PORT))
+
 class Observer_Telemetry(Observer):
-    def update(self,data):
+    def __init__(self, telemetry_socket=None):
+        self.telemetry_socket = telemetry_socket
+
+    def update(self, data):
+        # Console printing for debugging
         print(data)
+
+        # Send telemetry data via UDP if socket available
+        if self.telemetry_socket:
+            try:
+                telemetry_packet = json.dumps({
+                    "input_queue_size": data[0],
+                    "agregator_queue_size": data[1],
+                    "output_queue_size": data[2],
+                    "timestamp": time.time()
+                }).encode('utf-8')
+                self.telemetry_socket.sendto(telemetry_packet, (UDP_IP, TELEMETRY_PORT))
+            except Exception as e:
+                print(f"[Telemetry] Error sending UDP packet: {e}")
 
 class Pipeline:
     def __init__(self,config):
@@ -90,7 +109,11 @@ class Pipeline:
         self.input_producer.join()
         return
     def run_telemetry(self):
-        self.see = Observer_Telemetry()
+        # Create telemetry UDP socket
+        telemetry_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        print("Starting Telemetry...")
+        self.see = Observer_Telemetry(telemetry_socket=telemetry_socket)
         self.telemetry = Telemetry(self.input_queue, self.agregator_queue, self.output_queue)
         self.telemetry.subscribe(self.see)
         self.telemetry_proc = mp.Process(target=self.telemetry.poll, args=(0.01,))
