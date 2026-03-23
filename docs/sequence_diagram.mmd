@@ -1,0 +1,74 @@
+sequenceDiagram
+    participant Main as main.py
+    participant Pipeline
+    participant InputValidator
+    participant InputProducer
+    participant CoreManager
+    participant Aggregator
+    participant Telemetry
+    participant OutputWorker
+    participant Queues as Queues<br/>(MP)
+
+    Main->>Main: bootstrap()<br/>Load config
+
+    Main->>Pipeline: Pipeline(config)
+    activate Pipeline
+
+    Main->>Pipeline: bootstrap()
+    
+    Pipeline->>InputValidator: InputValidator(config)
+    activate InputValidator
+    InputValidator->>InputValidator: validate_all()
+    InputValidator-->>Pipeline: ✓ Valid
+    deactivate InputValidator
+
+    Pipeline->>Queues: Create input_queue<br/>agregator_queue<br/>output_queue
+    activate Queues
+    
+    Pipeline->>InputProducer: GenericInputProducer(input_queue, ...)
+    activate InputProducer
+    Pipeline->>InputProducer: run() in Process
+    InputProducer->>InputProducer: Read CSV data
+    InputProducer->>Queues: Put data to input_queue
+    
+    Pipeline->>CoreManager: CoreManager(input_queue, agregator_queue, ...)
+    activate CoreManager
+    Pipeline->>CoreManager: initialize_multiprocessing()
+    CoreManager->>Queues: Get from input_queue
+    CoreManager->>Queues: Put to agregator_queue
+    
+    Pipeline->>Aggregator: Agregator(agregator_queue, output_queue, ...)
+    activate Aggregator
+    Pipeline->>Aggregator: agregate() in Process
+    Aggregator->>Queues: Get from agregator_queue
+    Aggregator->>Aggregator: Running average<br/>calculation
+    Aggregator->>Queues: Put to output_queue
+    
+    Pipeline->>Telemetry: Telemetry(queues)
+    activate Telemetry
+    Pipeline->>Telemetry: subscribe(Observer)
+    Pipeline->>Telemetry: poll() in Process
+    Telemetry->>Queues: Monitor queue sizes
+    Telemetry->>Telemetry: Broadcast metrics
+    
+    Pipeline->>OutputWorker: worker(output_queue)<br/>in Process
+    activate OutputWorker
+    OutputWorker->>Queues: Get from output_queue
+    OutputWorker->>OutputWorker: Encode to JSON
+    OutputWorker->>OutputWorker: Send via UDP:5005
+    
+    Pipeline->>Pipeline: shutdown_all()
+    Pipeline->>InputProducer: terminate()
+    deactivate InputProducer
+    Pipeline->>CoreManager: shutdown_core()
+    deactivate CoreManager
+    Pipeline->>Aggregator: terminate()
+    deactivate Aggregator
+    Pipeline->>Telemetry: quit() + terminate()
+    deactivate Telemetry
+    Pipeline->>OutputWorker: terminate()
+    deactivate OutputWorker
+    
+    deactivate Queues
+    deactivate Pipeline
+    Main->>Main: Complete
