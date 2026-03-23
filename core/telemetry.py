@@ -23,8 +23,12 @@ class Telemetry:
     def poll(self,interval:int = 1):
         try:
             while not self.stop_event.is_set():
-                self.stop_event.wait(interval)   
-                self.notify()
+                self.stop_event.wait(interval)
+                try:
+                    self.notify()
+                except Exception as e:
+                    # Continue polling even if notify fails (e.g., observer errors)
+                    print(f"[Telemetry] Notify error: {e}")
         except KeyboardInterrupt:
             pass
 

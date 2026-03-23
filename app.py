@@ -122,7 +122,7 @@ def render_queue_health_card(title, current, max_val):
     return f"""
     <div style="background: rgba(30,40,60,0.5); padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.1);">
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-            <span style="color: #cbd5e1; font-size: 14px; font-weight: 600;">{title}</span>
+            <span style="color: white; font-size: 14px; font-weight: 600;">{title}</span>
             <span style="color: white; font-weight: bold;">{current} / {max_val}</span>
         </div>
         <div style="width: 100%; background: #1e293b; border-radius: 4px; height: 10px; overflow: hidden;">
@@ -145,20 +145,24 @@ st.set_page_config(
 st.markdown("""
     <style>
     .stApp { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: white; }
-    [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); }
+    [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: white; }
     [data-testid="stSidebar"] { background: linear-gradient(180deg, #0f1419 0%, #1a2332 100%); }
     section[data-testid="stSidebar"] > div { background: linear-gradient(180deg, #0f1419 0%, #1a2332 100%); }
     [data-testid="metric-container"] {
         background: linear-gradient(135deg, rgba(96, 165, 250, 0.1) 0%, rgba(147, 112, 219, 0.1) 100%);
         padding: 20px; border-radius: 12px; border: 1.5px solid rgba(96, 165, 250, 0.3); backdrop-filter: blur(10px);
     }
-    [data-testid="metric-container"] label { color: rgba(255, 255, 255, 0.8); }
+    [data-testid="metric-container"] label { color: white !important; }
+    [data-testid="metric-container"] div { color: white !important; }
     h1, h2, h3 { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-weight: 700; color: white; }
+    p { color: white; }
+    div { color: white; }
+    span { color: white; }
     hr { border-color: rgba(255, 255, 255, 0.5) !important; }
     button { background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border: none; border-radius: 8px; color: white; font-weight: 600; }
     button:hover { background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%); }
     [data-testid="stCheckbox"] { color: white; }
-    label { color: rgba(255, 255, 255, 0.9); }
+    label { color: white !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -201,6 +205,7 @@ state_defaults = {
     "packet_count": 0,
     "last_value": 0,
     "last_data_time": None,
+    "frozen_duration": None,  # Freeze duration when data stops
     "timeout_count": 0,       # <-- FIX: Added missing init
     "queue_history": [],      # <-- FIX: Added missing init
     "telemetry_data": {
@@ -310,6 +315,9 @@ with st.sidebar:
             st.session_state.data_list = []
             st.session_state.timestamps = []
             st.session_state.packet_count = 0
+            st.session_state.start_time = None
+            st.session_state.frozen_duration = None  # Reset frozen duration when clearing
+            st.session_state.last_data_time = None
             st.rerun()
 
 # ============================================================
@@ -343,7 +351,21 @@ def render_dashboard(is_live):
     with stats_placeholder.container():
         if st.session_state.data_list:
             d_arr = st.session_state.data_list
-            duration = (datetime.now() - st.session_state.start_time).total_seconds() if st.session_state.start_time else 0
+
+            # Check if data has timed out (no data for 2+ seconds)
+            time_since_last = time.time() - st.session_state.last_data_time if st.session_state.last_data_time else 0
+
+            # If data timed out, freeze the duration; otherwise calculate current duration
+            if time_since_last > 2.0:
+                # Data stopped - use frozen duration
+                if st.session_state.frozen_duration is None and st.session_state.start_time:
+                    # First time data stopped - freeze it now
+                    st.session_state.frozen_duration = (datetime.now() - st.session_state.start_time).total_seconds()
+                duration = st.session_state.frozen_duration if st.session_state.frozen_duration else 0
+            else:
+                # Data still flowing - calculate live duration
+                duration = (datetime.now() - st.session_state.start_time).total_seconds() if st.session_state.start_time else 0
+
             duration_str = f"{int(duration // 60)}m {int(duration % 60)}s" if duration >= 60 else f"{duration:.1f}s"
             rate = st.session_state.packet_count / max(duration, 0.1)
 
@@ -436,11 +458,8 @@ if st.session_state.stream_toggle:
                     tel_json = json.loads(tel_decoded)
 
                     for key, new_val in tel_json.items():
-                        current_val = st.session_state.telemetry_data.get(key, 0)
-                        if "queue_size" in key and new_val == 0 and current_val > 0:
-                            st.session_state.telemetry_data[key] = max(0, current_val - 1)
-                        else:
-                            st.session_state.telemetry_data[key] = new_val
+                        # Update telemetry data with real values (no smoothing)
+                        st.session_state.telemetry_data[key] = new_val
 
                     st.session_state.timeout_count = 0  
                     telemetry_received = True
