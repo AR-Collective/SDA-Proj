@@ -165,7 +165,7 @@ st.markdown("""
 st.markdown("""
     <div style="text-align: center; margin-bottom: 30px;">
         <h1 style="color: white; font-size: 48px; margin-bottom: 5px;">
-            📊 Executive Summary Dashboard
+            Dashboard
         </h1>
     </div>
 """, unsafe_allow_html=True)
@@ -208,7 +208,9 @@ state_defaults = {
         "agregator_queue_size": 0,
         "output_queue_size": 0,
         "timestamp": time.time()
-    }
+    },
+    "previous_stream_state": False,  # Track checkbox state changes
+    "pipeline_crashed": False  # Track if pipeline died unexpectedly
 }
 for key, val in state_defaults.items():
     if key not in st.session_state:
@@ -226,9 +228,8 @@ with col_left:
     stats_placeholder = st.empty()
 
 with col_right:
-    st.markdown("### 🏥 Pipeline Health")
+    st.markdown("### Pipeline Health")
     health_placeholder = st.empty()
-    st.markdown("### 📡 System Status")
     status_placeholder = st.empty()
 
 
@@ -236,24 +237,36 @@ with col_right:
 # SIDEBAR CONTROLS
 # ============================================================
 with st.sidebar:
-    st.markdown("### ⚙️ Pipeline Controls")
+    st.markdown("### Pipeline Controls")
     st.divider()
 
     run_streaming = st.checkbox("🎯 Start Live Stream", value=False, key="stream_toggle")
 
-    if run_streaming:
-        if not is_pipeline_running():
-            try:
-                start_pipeline()
-                time.sleep(0.5)
-            except Exception as e:
-                st.error(f"❌ Failed to start: {str(e)}")
-    else:
-        if is_pipeline_running():
-            try:
-                stop_pipeline()
-            except Exception as e:
-                st.error(f"❌ Failed to stop: {str(e)}")
+    # Only start/stop pipeline on STATE CHANGES, not on every rerun
+    if run_streaming != st.session_state.previous_stream_state:
+        st.session_state.previous_stream_state = run_streaming
+        st.session_state.pipeline_crashed = False  # Reset crash flag on toggle
+        
+        if run_streaming:
+            # Checkbox was just checked - start pipeline
+            if not is_pipeline_running():
+                try:
+                    start_pipeline()
+                    time.sleep(0.5)
+                except Exception as e:
+                    st.error(f"❌ Failed to start: {str(e)}")
+                    st.session_state.pipeline_crashed = True
+        else:
+            # Checkbox was just unchecked - stop pipeline
+            if is_pipeline_running():
+                try:
+                    stop_pipeline()
+                except Exception as e:
+                    st.error(f"❌ Failed to stop: {str(e)}")
+    
+    # Detect if pipeline crashed while checkbox is still checked
+    if run_streaming and not is_pipeline_running() and not st.session_state.pipeline_crashed:
+        st.session_state.pipeline_crashed = True
 
     st.divider()
     st.markdown("### 📡 Connection Status")
@@ -262,6 +275,8 @@ with st.sidebar:
             uptime_sec = (datetime.now() - st.session_state.pipeline_start_time).total_seconds()
             uptime = f"{int(uptime_sec // 3600)}h {int((uptime_sec % 3600) // 60)}m"
             st.success(f"✓ Active • Runtime: {uptime}")
+        elif st.session_state.pipeline_crashed:
+            st.error("❌ Pipeline Crashed - Uncheck and recheck to restart")
         else:
             st.warning("⚠ Stream Active • Backend Starting...")
     else:
@@ -285,13 +300,13 @@ with st.sidebar:
     st.divider()
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("📊 Export CSV", use_container_width=True):
+        if st.button("📊 Export CSV", width='stretch'):
             if st.session_state.data_list:
                 df = pd.DataFrame({'Value': st.session_state.data_list})
                 csv = df.to_csv(index=False)
                 st.download_button("Download", csv, f"data_{int(time.time())}.csv", "text/csv")
     with col2:
-        if st.button("🗑️ Clear Data", use_container_width=True):
+        if st.button("🗑️ Clear Data", width='stretch'):
             st.session_state.data_list = []
             st.session_state.timestamps = []
             st.session_state.packet_count = 0
@@ -313,14 +328,14 @@ def render_dashboard(is_live):
             c_type = st.session_state.get('chart_type_selector', '📈 Line Chart')
 
             if 'Line' in c_type:
-                st.line_chart(df, use_container_width=True)
+                st.line_chart(df, width='stretch')
             elif 'Area' in c_type:
-                st.area_chart(df, use_container_width=True)
+                st.area_chart(df, width='stretch')
             elif 'Bar' in c_type:
-                st.bar_chart(df, use_container_width=True)
+                st.bar_chart(df, width='stretch')
             elif 'Scatter' in c_type: 
                 df['Index'] = range(len(df))
-                st.scatter_chart(df, x='Index', y='Value', use_container_width=True)
+                st.scatter_chart(df, x='Index', y='Value', width='stretch')
         else:
             st.info(f"{'⏳ Waiting for data...' if is_live else '⏸️ No data to show'}")
 
@@ -363,57 +378,21 @@ def render_dashboard(is_live):
 
         st.markdown(html, unsafe_allow_html=True)
 
-        if st.session_state.queue_history:
-            df_hist = pd.DataFrame(st.session_state.queue_history)
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=df_hist['timestamp'], y=df_hist['input'], name='Input', line=dict(color='#3b82f6', width=2)))
-            fig.add_trace(go.Scatter(x=df_hist['timestamp'], y=df_hist['agregator'], name='Aggregator', line=dict(color='#8b5cf6', width=2)))
-            fig.add_trace(go.Scatter(x=df_hist['timestamp'], y=df_hist['output'], name='Output', line=dict(color='#ec4899', width=2)))
-
-            fig.update_layout(
-                margin=dict(l=10, r=10, t=30, b=10), title="Queue Depth Timeline", height=250,
-                template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(20, 30, 50, 0.3)'
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
     # 4. RENDER SYSTEM STATUS & SAFE PROGRESS BARS
     with status_placeholder.container():
-        if is_live:
-            st.success(f"🟢 System Live • Buffer: {len(st.session_state.data_list)}/{max_points}")
-        else:
-            st.info("🔴 System Paused")
-
-        st.divider()
-        c1, c2, c3 = st.columns(3)
-
-        # <-- FIX: Calculate strict 0.0 to 1.0 percentages for Streamlit Progress Bars
-        in_pct = min(1.0, max(0.0, in_q / max_q))
-        agg_pct = min(1.0, max(0.0, agg_q / max_q))
-        out_pct = min(1.0, max(0.0, out_q / max_q))
-
-        with c1:
-            st.metric("📥 Input", f"{in_q}")
-            st.progress(in_pct, text=f"{int(in_pct*100)}%")
-        with c2:
-            st.metric("⚙️ Aggregator", f"{agg_q}")
-            st.progress(agg_pct, text=f"{int(agg_pct*100)}%")
-        with c3:
-            st.metric("📤 Output", f"{out_q}")
-            st.progress(out_pct, text=f"{int(out_pct*100)}%")
-
-        st.caption(f"Last ping: {datetime.fromtimestamp(tel.get('timestamp', time.time())).strftime('%H:%M:%S.%f')[:-3]}")
+        pass
 
 
 # ============================================================
 # MAIN STREAM LOOP
 # ============================================================
-if run_streaming:
+if st.session_state.stream_toggle:
     # --- CRITICAL FIX: Make sockets instantly non-blocking for real-time UI ---
     st.session_state.sock.settimeout(0.0)
     if st.session_state.telemetry_sock:
         st.session_state.telemetry_sock.settimeout(0.0)
 
-    while run_streaming:
+    while st.session_state.stream_toggle:  # Check session state, not local variable
         # --- 1. Fetch Main Sensor Data (DRAIN SOCKET BUFFER) ---
         while True:
             try:
