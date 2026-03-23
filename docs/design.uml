@@ -1,5 +1,4 @@
-@startuml SDA_Phase3
-
+@startuml
 top to bottom direction
 skinparam backgroundColor #F9FAFB
 skinparam shadowing false
@@ -113,38 +112,8 @@ package "core" {
     }
 }
 
-' OUTPUT LAYER
+' STREAMLIT GUI / OUTPUT LAYER
 package "plugins/outputs" {
-    abstract class BaseOutputConsumer {
-        output_queue
-        config
-        --
-        consume()
-    }
-
-    class ConsoleConsumer {
-        consume()
-    }
-
-    class GUIConsumer {
-        dashboard
-        --
-        consume()
-    }
-
-    class DashboardApp {
-        pages
-        current_page_idx
-        fig
-        --
-        add_new_page(title)
-        add_element(page, func)
-        run()
-    }
-}
-
-' STREAMLIT GUI
-package "app.py" {
     class StreamlitApp {
         socket
         data_list
@@ -193,22 +162,14 @@ Observer_Telemetry ..|> Observer
 ' AGREGATION
 Agregator --> Config
 
-' OUTPUT CHAIN
-ConsoleConsumer --|> BaseOutputConsumer
-GUIConsumer --|> BaseOutputConsumer
-GUIConsumer --> DashboardApp
-
 ' DATA FLOW
-GenericInputProducer --> CoreLogic : Queue1
-CoreLogic --> Agregator : Queue2
-Agregator --> ConsoleConsumer : Queue3
-Agregator --> GUIConsumer : Queue3
-Agregator --> StreamlitApp : UDP
+GenericInputProducer --> CoreLogic : Queue1 (Input)
+CoreLogic --> Agregator : Queue2 (Aggregate)
+Agregator --> StreamlitApp : UDP (Output)
 
 ' MONITORING
-Telemetry --> GenericInputProducer : monitor
-Telemetry --> CoreLogic : monitor
-Telemetry --> Agregator : monitor
+Telemetry ..> CoreLogic : monitors input queue
+Telemetry ..> Agregator : monitors agregate & output queues
 
 ' GUI CONTROL
 StreamlitApp ..> Pipeline : control
@@ -237,5 +198,4 @@ note right of StreamlitApp
   Config management
   Process control
 end note
-
 @enduml
