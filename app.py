@@ -32,10 +32,10 @@ def save_config(config):
     with open(config_path, 'w') as f:
         json.dump(config, f, indent=2)
 
+
 # Initialize config in session state
 if "config" not in st.session_state:
     st.session_state.config = load_config()
-    # Ensure all required keys exist
     if "pipeline_dynamics" not in st.session_state.config:
         st.session_state.config["pipeline_dynamics"] = {}
     if "processing" not in st.session_state.config:
@@ -48,21 +48,16 @@ if "config" not in st.session_state:
 # ============================================================
 
 def start_pipeline():
-    """Start the main.py pipeline process."""
     if "pipeline_running" in st.session_state and st.session_state.pipeline_running:
-        return False  # Already running
-
+        return False
     try:
-        # Get the current working directory
         cwd = os.getcwd()
-
-        # Start process in non-blocking mode, redirect output to devnull to avoid deadlock
         process = subprocess.Popen(
             ["python3", "main.py"],
             cwd=cwd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True  # Detach from parent process
+            start_new_session=True
         )
         st.session_state.pipeline_process = process
         st.session_state.pipeline_running = True
@@ -73,125 +68,69 @@ def start_pipeline():
         raise e
 
 def stop_pipeline():
-    """Stop the main.py pipeline process."""
     if "pipeline_process" not in st.session_state:
         return False
-
     try:
         process = st.session_state.pipeline_process
-
-        # Check if process is still running
         if process.poll() is not None:
-            # Already terminated
             st.session_state.pipeline_running = False
-            if "pipeline_process" in st.session_state:
-                del st.session_state.pipeline_process
+            del st.session_state.pipeline_process
             return True
-
-        # Send terminate signal
         process.terminate()
         try:
             process.wait(timeout=3)
         except subprocess.TimeoutExpired:
-            # Force kill if it doesn't respond
             process.kill()
             process.wait()
-
         st.session_state.pipeline_running = False
-        if "pipeline_process" in st.session_state:
-            del st.session_state.pipeline_process
+        del st.session_state.pipeline_process
         return True
     except Exception as e:
         st.session_state.pipeline_running = False
         raise e
 
 def is_pipeline_running():
-    """Check if pipeline process is still running."""
     if "pipeline_process" not in st.session_state:
         st.session_state.pipeline_running = False
         return False
-
     process = st.session_state.pipeline_process
-    if process.poll() is None:  # Process still running
+    if process.poll() is None:
         return True
     else:
         st.session_state.pipeline_running = False
-        if "pipeline_process" in st.session_state:
-            del st.session_state.pipeline_process
+        del st.session_state.pipeline_process
         return False
 
-# Initialize process state
+
 if "pipeline_running" not in st.session_state:
     st.session_state.pipeline_running = False
-
 if "pipeline_start_time" not in st.session_state:
     st.session_state.pipeline_start_time = None
 
 # ============================================================
-# HELPER FUNCTIONS FOR ADVANCED CHARTS
+# HELPER FUNCTIONS FOR ADVANCED CHARTS & HTML
 # ============================================================
 
-def create_line_chart(data):
-    """Create a line chart visualization."""
-    df = pd.DataFrame({'Value': data, 'Index': range(len(data))})
-    return st.line_chart(df.set_index('Index')[['Value']], use_container_width=True)
+def render_queue_health_card(title, current, max_val):
+    """Safely render HTML queue health progress bars."""
+    safe_max = max(1, max_val)
+    percentage = min(100, max(0, int((current / safe_max) * 100)))
 
-def create_area_chart(data):
-    """Create an area chart visualization."""
-    df = pd.DataFrame({
-        'Running Average': data,
-        'Index': range(len(data))
-    })
-    return st.area_chart(df.set_index('Index')[['Running Average']], use_container_width=True)
+    # Color logic: Green < 70%, Yellow < 90%, Red >= 90%
+    color = "#22c55e" if percentage < 70 else "#eab308" if percentage < 90 else "#ef4444"
 
-def create_bar_chart(data):
-    """Create a bar chart visualization."""
-    df = pd.DataFrame({
-        'Value': data,
-        'Index': range(len(data))
-    })
-    return st.bar_chart(df.set_index('Index')[['Value']], use_container_width=True)
+    return f"""
+    <div style="background: rgba(30,40,60,0.5); padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: #cbd5e1; font-size: 14px; font-weight: 600;">{title}</span>
+            <span style="color: white; font-weight: bold;">{current} / {max_val}</span>
+        </div>
+        <div style="width: 100%; background: #1e293b; border-radius: 4px; height: 10px; overflow: hidden;">
+            <div style="width: {percentage}%; background: {color}; height: 100%; border-radius: 4px; transition: width 0.3s ease;"></div>
+        </div>
+    </div>
+    """
 
-def create_scatter_plot(data):
-    """Create a scatter plot visualization."""
-    df = pd.DataFrame({
-        'Value': data,
-        'Index': range(len(data))
-    })
-    return st.scatter_chart(df.set_index('Index')[['Value']], use_container_width=True)
-
-# def create_combined_chart(data):
-#     """Create a combined line + area chart using Plotly."""
-#     fig = go.Figure()
-
-#     # Add area trace
-#     fig.add_trace(go.Scatter(
-#         y=data,
-#         mode='lines',
-#         name='Running Average',
-#         fill='tozeroy',
-#         line=dict(color='rgba(59, 130, 246, 0.8)', width=2),
-#         fillcolor='rgba(59, 130, 246, 0.2)',
-#         hovertemplate='<b>Value:</b> %{y:.4f}<extra></extra>'
-#     ))
-
-    # Styling
-    fig.update_layout(
-        title='Live Sensor Data',
-        xaxis_title='Sample #',
-        yaxis_title='Value',
-        template='plotly_dark',
-        height=400,
-        hovermode='x unified',
-        margin=dict(l=50, r=50, t=50, b=50),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(20, 30, 50, 0.3)',
-        font=dict(color='white'),
-        xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
-        yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
-    )
-
-    return st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================
 # PAGE CONFIGURATION & THEMING
@@ -200,157 +139,39 @@ st.set_page_config(
     page_title="SDA Pipeline | Real-time Dashboard",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items=None
+    initial_sidebar_state="expanded"
 )
 
-# Apply dark theme with proper background
 st.markdown("""
     <style>
-    /* Full page background */
-    .stApp {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-        color: white;
-    }
-
-    /* Main content area */
-    [data-testid="stAppViewContainer"] {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    }
-
-    /* Sidebar background */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0f1419 0%, #1a2332 100%);
-    }
-
-    /* Remove default white background */
-    section[data-testid="stSidebar"] > div {
-        background: linear-gradient(180deg, #0f1419 0%, #1a2332 100%);
-    }
-
-    /* Metric cards */
+    .stApp { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: white; }
+    [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); }
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, #0f1419 0%, #1a2332 100%); }
+    section[data-testid="stSidebar"] > div { background: linear-gradient(180deg, #0f1419 0%, #1a2332 100%); }
     [data-testid="metric-container"] {
         background: linear-gradient(135deg, rgba(96, 165, 250, 0.1) 0%, rgba(147, 112, 219, 0.1) 100%);
-        padding: 20px;
-        border-radius: 12px;
-        border: 1.5px solid rgba(96, 165, 250, 0.3);
-        backdrop-filter: blur(10px);
+        padding: 20px; border-radius: 12px; border: 1.5px solid rgba(96, 165, 250, 0.3); backdrop-filter: blur(10px);
     }
-
-    [data-testid="metric-container"] label {
-        color: rgba(255, 255, 255, 0.8);
-    }
-
-    /* Heading styling */
-    h1, h2, h3 {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        color: white;
-    }
-
-    /* Chart container */
-    .chart-container, [data-testid="stPlotlyContainer"] {
-        background: rgba(20, 30, 50, 0.6);
-        border-radius: 12px;
-        border: 1px solid rgba(96, 165, 250, 0.2);
-    }
-
-    /* Divider */
-    hr {
-        border-color: rgba(255, 255, 255, 0.5) !important;
-    }
-
-    /* Buttons */
-    button {
-        background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-        border: none;
-        border-radius: 8px;
-        color: white;
-        font-weight: 600;
-    }
-
-    button:hover {
-        background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
-    }
-
-    /* Checkbox and inputs */
-    [data-testid="stCheckbox"] {
-        color: white;
-    }
-
-    label {
-        color: rgba(255, 255, 255, 0.9);
-    }
-
-    /* Text elements */
-    p {
-        color: rgba(255, 255, 255, 0.85);
-    }
-
-    /* Success/Warning messages */
-    .stSuccess {
-        background-color: rgba(34, 197, 94, 0.1);
-        color: rgb(134, 239, 172);
-    }
-
-    .stWarning {
-        background-color: rgba(251, 146, 60, 0.1);
-        color: rgb(253, 186, 116);
-    }
-
-    .stInfo {
-        background-color: rgba(59, 130, 246, 0.1);
-        color: rgb(147, 197, 253);
-    }
-
-    .stError {
-        background-color: rgba(239, 68, 68, 0.1);
-        color: rgb(252, 165, 165);
-    }
-
-    /* Expander */
-    [data-testid="stExpander"] {
-        border: 1px solid rgba(96, 165, 250, 0.2);
-        border-radius: 8px;
-    }
-
-    /* Slider */
-    [data-testid="stSlider"] {
-        color: white;
-    }
-
-    /* Download button */
-    [data-testid="stDownloadButton"] button {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    }
-
-    /* Sidebar headings */
-    [data-testid="stSidebar"] h3,
-    [data-testid="stSidebar"] h4 {
-        color: white !important;
-    }
-
-    [data-testid="stSidebar"] markdown h3,
-    [data-testid="stSidebar"] markdown h4 {
-        color: white !important;
-    }
+    [data-testid="metric-container"] label { color: rgba(255, 255, 255, 0.8); }
+    h1, h2, h3 { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-weight: 700; color: white; }
+    hr { border-color: rgba(255, 255, 255, 0.5) !important; }
+    button { background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border: none; border-radius: 8px; color: white; font-weight: 600; }
+    button:hover { background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%); }
+    [data-testid="stCheckbox"] { color: white; }
+    label { color: rgba(255, 255, 255, 0.9); }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# ============================================================
-# HEADER & BRANDING
-# ============================================================
 st.markdown("""
     <div style="text-align: center; margin-bottom: 30px;">
         <h1 style="color: white; font-size: 48px; margin-bottom: 5px;">
             📊 Executive Summary Dashboard
         </h1>
     </div>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ============================================================
-# SOCKET SETUP (Cached in Session State)
+# STATE & SOCKET SETUP 
 # ============================================================
 if "sock" not in st.session_state:
     try:
@@ -362,7 +183,6 @@ if "sock" not in st.session_state:
         st.error("❌ Port 5005 is busy. Make sure only one instance is running.")
         st.stop()
 
-# Telemetry socket (port 5006)
 if "telemetry_sock" not in st.session_state:
     try:
         telemetry_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -373,45 +193,44 @@ if "telemetry_sock" not in st.session_state:
         st.warning("⚠️ Port 5006 is busy. Telemetry data will not be available.")
         st.session_state.telemetry_sock = None
 
-# Initialize data structures
-if "data_list" not in st.session_state:
-    st.session_state.data_list = []
-
-if "timestamps" not in st.session_state:
-    st.session_state.timestamps = []
-
-if "start_time" not in st.session_state:
-    st.session_state.start_time = None
-
-if "packet_count" not in st.session_state:
-    st.session_state.packet_count = 0
-
-if "last_data_time" not in st.session_state:
-    st.session_state.last_data_time = None
-
-# Telemetry data structures
-if "telemetry_data" not in st.session_state:
-    st.session_state.telemetry_data = {
+# Initialize Core Data State
+state_defaults = {
+    "data_list": [],
+    "timestamps": [],
+    "start_time": None,
+    "packet_count": 0,
+    "last_value": 0,
+    "last_data_time": None,
+    "timeout_count": 0,       # <-- FIX: Added missing init
+    "queue_history": [],      # <-- FIX: Added missing init
+    "telemetry_data": {
         "input_queue_size": 0,
         "agregator_queue_size": 0,
         "output_queue_size": 0,
         "timestamp": time.time()
     }
+}
+for key, val in state_defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = val
 
 # ============================================================
-# MAIN CONTENT AREA PLACEHOLDERS (created once)
+# MAIN CONTENT AREA PLACEHOLDERS 
 # ============================================================
+col_left, col_right = st.columns([2, 1])
 
-st.markdown("### 📉 Live Sensor Data Chart")
-chart_placeholder = st.empty()
+with col_left:
+    st.markdown("### 📉 Live Sensor Data")
+    chart_placeholder = st.empty()
+    st.markdown("### 📊 Real-time Statistics")
+    stats_placeholder = st.empty()
 
-st.markdown("### 📊 Real-time Statistics")
-stats_placeholder = st.empty()
+with col_right:
+    st.markdown("### 🏥 Pipeline Health")
+    health_placeholder = st.empty()
+    st.markdown("### 📡 System Status")
+    status_placeholder = st.empty()
 
-st.markdown("### 🏥 Pipeline Health Dashboard")
-health_placeholder = st.empty()
-
-status_placeholder = st.empty()
 
 # ============================================================
 # SIDEBAR CONTROLS
@@ -420,222 +239,57 @@ with st.sidebar:
     st.markdown("### ⚙️ Pipeline Controls")
     st.divider()
 
-    # Integrated Start Live Stream with process management
     run_streaming = st.checkbox("🎯 Start Live Stream", value=False, key="stream_toggle")
 
-    # Start/stop pipeline process based on checkbox state
     if run_streaming:
-        is_running = is_pipeline_running()
-        if not is_running:
+        if not is_pipeline_running():
             try:
                 start_pipeline()
                 time.sleep(0.5)
             except Exception as e:
-                st.error(f"❌ Failed to start pipeline: {str(e)}")
+                st.error(f"❌ Failed to start: {str(e)}")
     else:
-        is_running = is_pipeline_running()
-        if is_running:
+        if is_pipeline_running():
             try:
                 stop_pipeline()
             except Exception as e:
-                st.error(f"❌ Failed to stop pipeline: {str(e)}")
-
-        # Reset display state when stopping
-        st.session_state.data_list = []
-        st.session_state.timestamps = []
-        st.session_state.packet_count = 0
-        st.session_state.start_time = None
-        st.session_state.last_data_time = None
-        with chart_placeholder.container():
-            st.empty()
-        with stats_placeholder.container():
-            st.empty()
-        with status_placeholder.container():
-            st.empty()
+                st.error(f"❌ Failed to stop: {str(e)}")
 
     st.divider()
-
-    # Info section - shows both stream and backend status
     st.markdown("### 📡 Connection Status")
     if run_streaming:
-        is_running = is_pipeline_running()
-        if is_running and st.session_state.pipeline_start_time:
+        if is_pipeline_running() and st.session_state.pipeline_start_time:
             uptime_sec = (datetime.now() - st.session_state.pipeline_start_time).total_seconds()
-            hours = int(uptime_sec // 3600)
-            minutes = int((uptime_sec % 3600) // 60)
-            uptime = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
-            st.success(f"✓ Stream Active • Backend Running ({uptime})")
+            uptime = f"{int(uptime_sec // 3600)}h {int((uptime_sec % 3600) // 60)}m"
+            st.success(f"✓ Active • Runtime: {uptime}")
         else:
             st.warning("⚠ Stream Active • Backend Starting...")
     else:
         st.info("⊗ Stream Paused")
 
     st.divider()
+    max_points = st.slider("Max data points to display", 10, 200, 50, 10, key="max_points_slider")
+    refresh_rate_ms = st.slider("Refresh rate (ms)", 10, 100, 20, 5, key="refresh_rate_slider")
 
-    # Display settings
-    st.markdown("### 📈 Display Settings")
-    max_points = st.slider(
-        "Max data points to display",
-        min_value=10,
-        max_value=200,
-        value=50,
-        step=10,
-        key="max_points_slider"  # Prevent accidental reruns
-    )
-
-    st.divider()
-
-    # Refresh rate setting
-    st.markdown("### ⚡ Performance")
-    refresh_rate_ms = st.slider(
-        "Refresh rate (milliseconds)",
-        min_value=10,
-        max_value=100,
-        value=20,
-        step=5,
-        key="refresh_rate_slider",  # Prevent accidental reruns
-        help="Lower = faster updates, Higher = smoother but slower"
-    )
-
-    # Trim buffer if max_points changed
     if st.session_state.data_list and len(st.session_state.data_list) > max_points:
-        excess = len(st.session_state.data_list) - max_points
-        st.session_state.data_list = st.session_state.data_list[excess:]
-        st.session_state.timestamps = st.session_state.timestamps[excess:]
+        st.session_state.data_list = st.session_state.data_list[-max_points:]
+        st.session_state.timestamps = st.session_state.timestamps[-max_points:]
 
     st.divider()
-
-    # Configuration settings
-    st.markdown("### ⚙️ Pipeline Configuration")
-
-    with st.expander("🔧 Advanced Settings", expanded=False):
-        config = st.session_state.config
-
-        # Pipeline Dynamics
-        st.markdown("**Pipeline Dynamics**")
-        col_pdyn1, col_pdyn2 = st.columns(2)
-
-        with col_pdyn1:
-            input_delay = st.number_input(
-                "Input Delay (sec)",
-                min_value=0.001,
-                max_value=1.0,
-                value=config.get("pipeline_dynamics", {}).get("input_delay_seconds", 0.01),
-                step=0.001,
-                format="%.4f",
-                key="input_delay_input",
-                help="Delay between reading CSV rows"
-            )
-            config["pipeline_dynamics"]["input_delay_seconds"] = input_delay
-
-        with col_pdyn2:
-            core_parallelism = st.number_input(
-                "Core Parallelism",
-                min_value=1,
-                max_value=16,
-                value=config.get("pipeline_dynamics", {}).get("core_parallelism", 2),
-                step=1,
-                key="core_parallelism_input",
-                help="Number of parallel core workers"
-            )
-            config["pipeline_dynamics"]["core_parallelism"] = core_parallelism
-
-        stream_queue = st.slider(
-            "Stream Queue Size",
-            min_value=10,
-            max_value=200,
-            value=config.get("pipeline_dynamics", {}).get("stream_queue_max_size", 50),
-            step=5,
-            key="stream_queue_slider",
-            help="Maximum size of the processing queue"
-        )
-        config["pipeline_dynamics"]["stream_queue_max_size"] = stream_queue
-
-        # Processing settings
-        st.markdown("**Processing**")
-        window_size = st.slider(
-            "Running Average Window",
-            min_value=1,
-            max_value=50,
-            value=config.get("processing", {}).get("stateful_tasks", {}).get("running_average_window_size", 10),
-            step=1,
-            key="window_size_slider",
-            help="Sample window for running average calculation"
-        )
-        config["processing"]["stateful_tasks"]["running_average_window_size"] = window_size
-
-        # Save/Reload buttons
-        col_save1, col_save2 = st.columns([1, 1])
-        with col_save1:
-            save_clicked = st.button("💾 Save to config.json", use_container_width=True)
-
-        with col_save2:
-            reload_clicked = st.button("🔄 Reload from File", use_container_width=True)
-
-        # Messages (full width)
-        if save_clicked:
-            try:
-                save_config(config)
-                st.session_state.config = config
-                st.success("✅ Configuration saved successfully!")
-            except Exception as e:
-                st.error(f"❌ Error saving config: {str(e)}")
-
-        if reload_clicked:
-            try:
-                st.session_state.config = load_config()
-                st.info("✓ Configuration reloaded")
-            except Exception as e:
-                st.error(f"❌ Error reloading config: {str(e)}")
-
-        # Display current config summary
-        st.markdown("**Current Configuration Summary**")
-        st.json({
-            "input_delay_seconds": config.get("pipeline_dynamics", {}).get("input_delay_seconds", 0.01),
-            "core_parallelism": config.get("pipeline_dynamics", {}).get("core_parallelism", 2),
-            "stream_queue_max_size": config.get("pipeline_dynamics", {}).get("stream_queue_max_size", 50),
-            "running_average_window_size": config.get("processing", {}).get("stateful_tasks", {}).get("running_average_window_size", 10)
-        })
-
-    st.divider()
-
-    # Chart type selection
-    st.markdown("### 📊 Chart Type")
     chart_type = st.radio(
         "Choose visualization type",
-        options=[
-            "📈 Line Chart",
-            "📊 Area Chart",
-            "📉 Bar Chart",
-            "🎯 Scatter Plot",
-            # "🔀 Combined (Line + Fill)"
-        ],
-        horizontal=True,
+        ["📈 Line Chart", "📊 Area Chart", "📉 Bar Chart", "🎯 Scatter Plot"],
         key="chart_type_selector"
     )
 
     st.divider()
-
-    # Data management
-    st.markdown("### 💾 Data Management")
     col1, col2 = st.columns(2)
-
     with col1:
         if st.button("📊 Export CSV", use_container_width=True):
             if st.session_state.data_list:
-                df = pd.DataFrame({
-                    'Timestamp': st.session_state.timestamps if st.session_state.timestamps else range(len(st.session_state.data_list)),
-                    'Value': st.session_state.data_list
-                })
+                df = pd.DataFrame({'Value': st.session_state.data_list})
                 csv = df.to_csv(index=False)
-                st.download_button(
-                    label="Download CSV",
-                    data=csv,
-                    file_name=f"sensor_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-
+                st.download_button("Download", csv, f"data_{int(time.time())}.csv", "text/csv")
     with col2:
         if st.button("🗑️ Clear Data", use_container_width=True):
             st.session_state.data_list = []
@@ -643,370 +297,198 @@ with st.sidebar:
             st.session_state.packet_count = 0
             st.rerun()
 
-    st.divider()
+# ============================================================
+# UNIFIED DASHBOARD RENDERER (Solves Pause/Play Disappearance)
+# ============================================================
+def render_dashboard(is_live):
+    """Updates all placeholders with current state data."""
+
+    # 1. RENDER CHART
+    with chart_placeholder.container():
+        if st.session_state.data_list:
+            if not is_live:
+                st.info("⏸️ Stream paused - showing last data")
+
+            df = pd.DataFrame({'Value': st.session_state.data_list})
+            c_type = st.session_state.get('chart_type_selector', '📈 Line Chart')
+
+            if 'Line' in c_type:
+                st.line_chart(df, use_container_width=True)
+            elif 'Area' in c_type:
+                st.area_chart(df, use_container_width=True)
+            elif 'Bar' in c_type:
+                st.bar_chart(df, use_container_width=True)
+            elif 'Scatter' in c_type: 
+                df['Index'] = range(len(df))
+                st.scatter_chart(df, x='Index', y='Value', use_container_width=True)
+        else:
+            st.info(f"{'⏳ Waiting for data...' if is_live else '⏸️ No data to show'}")
+
+    # 2. RENDER STATISTICS
+    with stats_placeholder.container():
+        if st.session_state.data_list:
+            d_arr = st.session_state.data_list
+            duration = (datetime.now() - st.session_state.start_time).total_seconds() if st.session_state.start_time else 0
+            duration_str = f"{int(duration // 60)}m {int(duration % 60)}s" if duration >= 60 else f"{duration:.1f}s"
+            rate = st.session_state.packet_count / max(duration, 0.1)
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("📍 Current", f"{st.session_state.last_value:.4f}")
+            c2.metric("📈 Average", f"{(sum(d_arr) / len(d_arr)):.4f}")
+            c3.metric("⬆️ Max", f"{max(d_arr):.4f}")
+            c4.metric("⬇️ Min", f"{min(d_arr):.4f}")
+
+            st.divider()
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("📊 Total Count", st.session_state.packet_count)
+            c2.metric("⏱️ Duration", duration_str)
+            c3.metric("📏 Buffer", f"{len(d_arr)}/{max_points}")
+            c4.metric("⚡ Data Rate", f"{rate:.1f}/s")
+
+    # 3. RENDER HEALTH (Queues & History)
+    with health_placeholder.container():
+        tel = st.session_state.telemetry_data
+        conf = st.session_state.config
+        max_q = max(1, conf.get("pipeline_dynamics", {}).get("stream_queue_max_size", 50))
+
+        in_q, agg_q, out_q = tel.get("input_queue_size", 0), tel.get("agregator_queue_size", 0), tel.get("output_queue_size", 0)
+
+        html = ""
+        html += render_queue_health_card("Input Queue", in_q, max_q)
+        html += render_queue_health_card("Aggregator Queue", agg_q, max_q)
+        html += render_queue_health_card("Output Queue", out_q, max_q)
+
+        if st.session_state.timeout_count >= 3:
+            html += '<div style="padding: 8px; border-radius: 6px; background: rgba(255,165,0,0.1); border: 1px solid rgba(255,165,0,0.3); text-align: center; color: orange;">⏸️ Pipeline Idle / Data Stopped</div>'
+
+        st.markdown(html, unsafe_allow_html=True)
+
+        if st.session_state.queue_history:
+            df_hist = pd.DataFrame(st.session_state.queue_history)
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=df_hist['timestamp'], y=df_hist['input'], name='Input', line=dict(color='#3b82f6', width=2)))
+            fig.add_trace(go.Scatter(x=df_hist['timestamp'], y=df_hist['agregator'], name='Aggregator', line=dict(color='#8b5cf6', width=2)))
+            fig.add_trace(go.Scatter(x=df_hist['timestamp'], y=df_hist['output'], name='Output', line=dict(color='#ec4899', width=2)))
+
+            fig.update_layout(
+                margin=dict(l=10, r=10, t=30, b=10), title="Queue Depth Timeline", height=250,
+                template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(20, 30, 50, 0.3)'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    # 4. RENDER SYSTEM STATUS & SAFE PROGRESS BARS
+    with status_placeholder.container():
+        if is_live:
+            st.success(f"🟢 System Live • Buffer: {len(st.session_state.data_list)}/{max_points}")
+        else:
+            st.info("🔴 System Paused")
+
+        st.divider()
+        c1, c2, c3 = st.columns(3)
+
+        # <-- FIX: Calculate strict 0.0 to 1.0 percentages for Streamlit Progress Bars
+        in_pct = min(1.0, max(0.0, in_q / max_q))
+        agg_pct = min(1.0, max(0.0, agg_q / max_q))
+        out_pct = min(1.0, max(0.0, out_q / max_q))
+
+        with c1:
+            st.metric("📥 Input", f"{in_q}")
+            st.progress(in_pct, text=f"{int(in_pct*100)}%")
+        with c2:
+            st.metric("⚙️ Aggregator", f"{agg_q}")
+            st.progress(agg_pct, text=f"{int(agg_pct*100)}%")
+        with c3:
+            st.metric("📤 Output", f"{out_q}")
+            st.progress(out_pct, text=f"{int(out_pct*100)}%")
+
+        st.caption(f"Last ping: {datetime.fromtimestamp(tel.get('timestamp', time.time())).strftime('%H:%M:%S.%f')[:-3]}")
+
 
 # ============================================================
 # MAIN STREAM LOOP
 # ============================================================
-while run_streaming:
-    sock = st.session_state.sock
-
-    try:
-        # Receive data
-        packet, _ = sock.recvfrom(4096)
-        decoded = packet.decode("utf-8").strip()
-
-        # Parse logic (Handle raw float or JSON)
-        try:
-            val = float(decoded)
-        except ValueError:
-            try:
-                parsed = json.loads(decoded)
-                val = float(parsed.get("Raw_Value", parsed.get("value", 0)))
-            except:
-                val = None
-
-        # Initialize start time on first data
-        if st.session_state.start_time is None:
-            st.session_state.start_time = datetime.now()
-
-        # Append data
-        st.session_state.data_list.append(val)
-        st.session_state.timestamps.append(datetime.now())
-        st.session_state.packet_count += 1
-        st.session_state.last_data_time = time.time()  # Track when we last received data
-
-        # Keep list size manageable
-        if len(st.session_state.data_list) > max_points:
-            st.session_state.data_list.pop(0)
-            st.session_state.timestamps.pop(0)
-
-    except (socket.timeout, BlockingIOError):
-        pass
-    except Exception as e:
-        pass
-
-    # ========== RECEIVE TELEMETRY DATA ==========
+if run_streaming:
+    # --- CRITICAL FIX: Make sockets instantly non-blocking for real-time UI ---
+    st.session_state.sock.settimeout(0.0)
     if st.session_state.telemetry_sock:
-        try:
-            telemetry_packet, _ = st.session_state.telemetry_sock.recvfrom(4096)
-            telemetry_decoded = telemetry_packet.decode("utf-8").strip()
-            telemetry_json = json.loads(telemetry_decoded)
-            st.session_state.telemetry_data = telemetry_json
-            # Debug: Show that telemetry is being received
-            # print(f"[Telemetry] Queue sizes - Input: {telemetry_json.get('input_queue_size')}, Agg: {telemetry_json.get('agregator_queue_size')}, Out: {telemetry_json.get('output_queue_size')}")
-        except (socket.timeout, BlockingIOError):
-            pass
-        except Exception as e:
-            # Telemetry receive errors are non-critical
-            pass
+        st.session_state.telemetry_sock.settimeout(0.0)
 
-    # ========== DISPLAY CHART ==========
-    if st.session_state.data_list:
-        with chart_placeholder.container():
-            chart_type_selected = st.session_state.get('chart_type_selector', '📈 Line Chart')
+    while run_streaming:
+        # --- 1. Fetch Main Sensor Data (DRAIN SOCKET BUFFER) ---
+        while True:
+            try:
+                packet, _ = st.session_state.sock.recvfrom(4096)
+                decoded = packet.decode("utf-8").strip()
 
-            if '📈 Line Chart' in chart_type_selected:
-                st.line_chart(
-                    pd.DataFrame({'Running Average': st.session_state.data_list}),
-                    use_container_width=True
-                )
-            elif '📊 Area Chart' in chart_type_selected:
-                st.area_chart(
-                    pd.DataFrame({'Running Average': st.session_state.data_list}),
-                    use_container_width=True
-                )
-            elif '📉 Bar Chart' in chart_type_selected:
-                st.bar_chart(
-                    pd.DataFrame({'Running Average': st.session_state.data_list}),
-                    use_container_width=True
-                )
-            elif '🎯 Scatter Plot' in chart_type_selected:
-                df_scatter = pd.DataFrame({
-                    'Index': range(len(st.session_state.data_list)),
-                    'Value': st.session_state.data_list
+                try:
+                    val = float(decoded)
+                except ValueError:
+                    try:
+                        parsed = json.loads(decoded)
+                        val = float(parsed.get("Raw_Value", parsed.get("value", 0)))
+                    except:
+                        val = None
+
+                if val is not None:
+                    if st.session_state.start_time is None:
+                        st.session_state.start_time = datetime.now()
+
+                    st.session_state.data_list.append(val)
+                    st.session_state.timestamps.append(datetime.now())
+                    st.session_state.packet_count += 1
+                    st.session_state.last_value = val
+                    st.session_state.last_data_time = time.time()
+
+            except (socket.timeout, BlockingIOError):
+                break  # Buffer empty, instantly move to the next step
+
+        # Keep data_list trimmed strictly to max_points AFTER draining
+        if len(st.session_state.data_list) > max_points:
+            st.session_state.data_list = st.session_state.data_list[-max_points:]
+            st.session_state.timestamps = st.session_state.timestamps[-max_points:]
+
+        # --- 2. Fetch Telemetry Data (DRAIN SOCKET BUFFER) ---
+        if st.session_state.telemetry_sock:
+            telemetry_received = False
+            while True:
+                try:
+                    tel_packet, _ = st.session_state.telemetry_sock.recvfrom(4096)
+                    tel_decoded = tel_packet.decode("utf-8").strip()
+                    tel_json = json.loads(tel_decoded)
+
+                    for key, new_val in tel_json.items():
+                        current_val = st.session_state.telemetry_data.get(key, 0)
+                        if "queue_size" in key and new_val == 0 and current_val > 0:
+                            st.session_state.telemetry_data[key] = max(0, current_val - 1)
+                        else:
+                            st.session_state.telemetry_data[key] = new_val
+
+                    st.session_state.timeout_count = 0  
+                    telemetry_received = True
+                except (socket.timeout, BlockingIOError):
+                    if not telemetry_received:
+                        st.session_state.timeout_count += 1
+                    break
+                except Exception:
+                    pass
+
+            if telemetry_received:
+                st.session_state.queue_history.append({
+                    "timestamp": datetime.fromtimestamp(st.session_state.telemetry_data.get("timestamp", time.time())),
+                    "input": st.session_state.telemetry_data.get("input_queue_size", 0),
+                    "agregator": st.session_state.telemetry_data.get("agregator_queue_size", 0),
+                    "output": st.session_state.telemetry_data.get("output_queue_size", 0)
                 })
-                st.scatter_chart(df_scatter, x='Index', y='Value', use_container_width=True)
-            elif '🔀 Combined' in chart_type_selected:
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    y=st.session_state.data_list,
-                    mode='lines',
-                    name='Running Average',
-                    fill='tozeroy',
-                    line=dict(color='rgba(59, 130, 246, 0.8)', width=2),
-                    fillcolor='rgba(59, 130, 246, 0.2)',
-                    hovertemplate='<b>Value:</b> %{y:.4f}<extra></extra>'
-                ))
-                fig.update_layout(
-                    title='Live Sensor Data',
-                    xaxis_title='Sample #',
-                    yaxis_title='Value',
-                    template='plotly_dark',
-                    height=400,
-                    hovermode='x unified',
-                    margin=dict(l=50, r=50, t=50, b=50),
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(20, 30, 50, 0.3)',
-                    font=dict(color='white'),
-                    xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
-                    yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
-                )
-                st.plotly_chart(fig, use_container_width=True)
 
-        # ========== DISPLAY STATISTICS ==========
-        if st.session_state.data_list:
-            data_array = st.session_state.data_list
-            min_val = min(data_array)
-            max_val = max(data_array)
-            avg_val = sum(data_array) / len(data_array)
+                if len(st.session_state.queue_history) > max_points:
+                    st.session_state.queue_history = st.session_state.queue_history[-max_points:]
 
-            # Duration calculation
-            if st.session_state.start_time:
-                duration = (datetime.now() - st.session_state.start_time).total_seconds()
-                duration_str = f"{int(duration // 60)}m {int(duration % 60)}s" if duration >= 60 else f"{duration:.1f}s"
-            else:
-                duration_str = "---"
+        # --- 3. Render Dashboard Live ---
+        render_dashboard(is_live=True)
 
-            # Create statistics display
-            with stats_placeholder.container():
-                st.markdown("""
-                    <style>
-                    .stats-row {
-                        display: grid;
-                        grid-template-columns: repeat(5, 1fr);
-                        gap: 15px;
-                        margin: 20px 0;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
+        # UI Sleep - controls how fast Streamlit repaints the screen
+        time.sleep(refresh_rate_ms / 1000)
 
-                col1, col2, col3, col4, col5 = st.columns(5)
-
-                with col1:
-                    st.metric(
-                        label="📍 Current",
-                        value=f"{val:.4f}",
-                        delta=None
-                    )
-
-                with col2:
-                    st.metric(
-                        label="📊 Count",
-                        value=st.session_state.packet_count,
-                        delta=None
-                    )
-
-                with col3:
-                    st.metric(
-                        label="📈 Average",
-                        value=f"{avg_val:.4f}",
-                        delta=None
-                    )
-
-                with col4:
-                    st.metric(
-                        label="⬆️ Max",
-                        value=f"{max_val:.4f}",
-                        delta=None
-                    )
-
-                with col5:
-                    st.metric(
-                        label="⬇️ Min",
-                        value=f"{min_val:.4f}",
-                        delta=None
-                    )
-
-                st.divider()
-
-                # Additional metrics
-                col_a, col_b, col_c, col_d = st.columns(4)
-
-                with col_a:
-                    st.metric(
-                        label="⏱️ Duration",
-                        value=duration_str,
-                        delta=None
-                    )
-
-                with col_b:
-                    st.metric(
-                        label="📍 Points Buffered",
-                        value=len(st.session_state.data_list),
-                        delta=None
-                    )
-
-                with col_c:
-                    range_val = max_val - min_val
-                    st.metric(
-                        label="📏 Range",
-                        value=f"{range_val:.4f}",
-                        delta=None
-                    )
-
-                with col_d:
-                    packets_per_sec = st.session_state.packet_count / max(duration, 0.1) if duration_str != "---" else 0
-                    st.metric(
-                        label="⚡ Data Rate",
-                        value=f"{packets_per_sec:.1f}/s",
-                        delta=None
-                    )
-
-        # Check if data has timed out (no data for 2+ seconds)
-        time_since_last = None
-        if st.session_state.last_data_time is not None:
-            time_since_last = time.time() - st.session_state.last_data_time
-
-        # ========== STATUS ==========
-        # Show "Live" only if we have data AND received something in the last 2 seconds
-        if st.session_state.data_list and time_since_last is not None and time_since_last < 2.0:
-            with status_placeholder.container():
-                st.success(f"✅ Live • Receiving: {val:.6f} • Buffer: {len(st.session_state.data_list)}/{max_points}")
-        else:
-            # Show "Waiting" if no data or timeout occurred
-            with status_placeholder.container():
-                if st.session_state.data_list:
-                    st.warning("⏳ Data Stream Ended • No packets received for 2+ seconds")
-                else:
-                    st.warning("⏳ Waiting for UDP packets on 127.0.0.1:5005...")
-
-    time.sleep(refresh_rate_ms / 1000)  # Convert milliseconds to seconds
-
-    # ========== HEALTH DASHBOARD (Outside loop for performance) ==========
-    # Render health dashboard using latest telemetry data
-    with health_placeholder.container():
-        telemetry = st.session_state.telemetry_data
-        input_q = telemetry.get("input_queue_size", 0)
-        agg_q = telemetry.get("agregator_queue_size", 0)
-        out_q = telemetry.get("output_queue_size", 0)
-
-        # Determine queue fill status
-        max_q_size = max_points
-        input_fill = min(100, (input_q / max_q_size * 100)) if max_q_size > 0 else 0
-        agg_fill = min(100, (agg_q / max_q_size * 100)) if max_q_size > 0 else 0
-        out_fill = min(100, (out_q / max_q_size * 100)) if max_q_size > 0 else 0
-
-        # Status badge
-        is_running = is_pipeline_running()
-        status_badge = "🟢 Healthy" if is_running else "🔴 Offline"
-
-        # Display status
-        col_status1, col_status2 = st.columns([1, 3])
-        with col_status1:
-            st.write(status_badge)
-        with col_status2:
-            st.write(f"Pipeline Status: {'Running' if is_running else 'Not Running'}")
-
-        st.divider()
-
-        # Display queues with progress bars
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.metric("📥 Input Queue", f"{input_q}/{max_q_size}")
-            st.progress(int(input_fill) / 100, text=f"{input_fill:.0f}%")
-
-        with col2:
-            st.metric("⚙️ Aggregator Queue", f"{agg_q}/{max_q_size}")
-            st.progress(int(agg_fill) / 100, text=f"{agg_fill:.0f}%")
-
-        with col3:
-            st.metric("📤 Output Queue", f"{out_q}/{max_q_size}")
-            st.progress(int(out_fill) / 100, text=f"{out_fill:.0f}%")
-
-        # Last update timestamp
-        st.caption(f"Last update: {datetime.fromtimestamp(telemetry.get('timestamp', time.time())).strftime('%H:%M:%S.%f')[:-3]}")
-
-# ============================================================
-# PAUSED STATE
-# ============================================================
-if not run_streaming:
-    if st.session_state.data_list:
-        with chart_placeholder.container():
-            st.info("⏸️ Stream paused - showing last data")
-
-            chart_type_selected = st.session_state.get('chart_type_selector', '📈 Line Chart')
-
-            if '📈 Line Chart' in chart_type_selected:
-                st.line_chart(
-                    pd.DataFrame({'Running Average': st.session_state.data_list}),
-                    use_container_width=True
-                )
-            elif '📊 Area Chart' in chart_type_selected:
-                st.area_chart(
-                    pd.DataFrame({'Running Average': st.session_state.data_list}),
-                    use_container_width=True
-                )
-            elif '📉 Bar Chart' in chart_type_selected:
-                st.bar_chart(
-                    pd.DataFrame({'Running Average': st.session_state.data_list}),
-                    use_container_width=True
-                )
-            elif '🎯 Scatter Plot' in chart_type_selected:
-                df_scatter = pd.DataFrame({
-                    'Index': range(len(st.session_state.data_list)),
-                    'Value': st.session_state.data_list
-                })
-                st.scatter_chart(df_scatter, x='Index', y='Value', use_container_width=True)
-            # elif '🔀 Combined' in chart_type_selected:
-            #     fig = go.Figure()
-            #     fig.add_trace(go.Scatter(
-            #         y=st.session_state.data_list,
-            #         mode='lines',
-            #         name='Running Average',
-            #         fill='tozeroy',
-            #         line=dict(color='rgba(59, 130, 246, 0.8)', width=2),
-            #         fillcolor='rgba(59, 130, 246, 0.2)',
-            #         hovertemplate='<b>Value:</b> %{y:.4f}<extra></extra>'
-            #     ))
-            #     fig.update_layout(
-            #         title='Live Sensor Data',
-            #         xaxis_title='Sample #',
-            #         yaxis_title='Value',
-            #         template='plotly_dark',
-            #         height=400,
-            #         hovermode='x unified',
-            #         margin=dict(l=50, r=50, t=50, b=50),
-            #         paper_bgcolor='rgba(0,0,0,0)',
-            #         plot_bgcolor='rgba(20, 30, 50, 0.3)',
-            #         font=dict(color='white'),
-            #         xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
-            #         yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(96, 165, 250, 0.1)'),
-            #     )
-            #     st.plotly_chart(fig, use_container_width=True)
-
-        # Show final statistics
-        with stats_placeholder.container():
-            if st.session_state.data_list:
-                data_array = st.session_state.data_list
-                min_val = min(data_array)
-                max_val = max(data_array)
-                avg_val = sum(data_array) / len(data_array)
-
-                col1, col2, col3, col4, col5 = st.columns(5)
-
-                with col1:
-                    st.metric(label="📍 Last Value", value=f"{st.session_state.data_list[-1]:.4f}")
-
-                with col2:
-                    st.metric(label="📊 Total Points", value=st.session_state.packet_count)
-
-                with col3:
-                    st.metric(label="📈 Average", value=f"{avg_val:.4f}")
-
-                with col4:
-                    st.metric(label="⬆️ Max", value=f"{max_val:.4f}")
-
-                with col5:
-                    st.metric(label="⬇️ Min", value=f"{min_val:.4f}")
-    else:
-        with chart_placeholder.container():
-            st.info("⏸️ Stream paused - no data received yet")
-        st.markdown("### 🚀 Getting Started")
-        st.write("""
-        1. Click the 'Start Live Stream' checkbox in the sidebar
-        2. Run python main.py to start the data pipeline
-        3. See live chart updates and statistics
-        4. Use the sidebar to export or clear data
-        """)
+else:
+    # --- 4. Render Static Dashboard when Paused ---
+    render_dashboard(is_live=False)

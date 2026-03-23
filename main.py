@@ -29,7 +29,7 @@ def worker(output_queue):
         data = output_queue.get()
         if data is None:
             return
-        time.sleep(0.1)
+        time.sleep(0.01)
         message = json.dumps(data).encode('utf-8')
         sock.sendto(message, (UDP_IP, UDP_PORT))
 
@@ -38,10 +38,8 @@ class Observer_Telemetry(Observer):
         self.telemetry_socket = telemetry_socket
 
     def update(self, data):
-        # Console printing for debugging
         print(data)
 
-        # Send telemetry data via UDP if socket available
         if self.telemetry_socket:
             try:
                 telemetry_packet = json.dumps({
